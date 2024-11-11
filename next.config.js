@@ -12,12 +12,28 @@ const withPWA = require('@ducanh2912/next-pwa').default({
 })
 
 const nextConfig = {
-  // uncomment the following snippet if using styled components
-  // compiler: {
-  //   styledComponents: true,
-  // },
   reactStrictMode: true, // Recommended for the `pages` directory, default in `app`.
   images: {},
+  //xhr support
+  headers: [
+    {
+      source: '/:path*',
+      headers: [
+        {
+          key: 'Access-Control-Allow-Origin',
+          value: '*',
+        },
+        {
+          key: 'Access-Control-Allow-Methods',
+          value: 'GET',
+        },
+        {
+          key: 'Access-Control-Allow-Headers',
+          value: 'Content-Type, Accept',
+        },
+      ],
+    },
+  ],
   webpack(config, { isServer }) {
     if (!isServer) {
       // We're in the browser build, so we can safely exclude the sharp module

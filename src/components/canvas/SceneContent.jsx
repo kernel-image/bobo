@@ -54,7 +54,8 @@ const SceneContent = () =>  {
   //animation
 
   //camera spring
-  const [camPosition, setCamPosition] = useState([0, playerHeight, 1.5]);
+  const camOrigin = [0, playerHeight, 1.5]
+  const [camPosition, setCamPosition] = useState(camOrigin);
   const [nextCamPosition, setNextCamPosition] = useState(camPosition)
   const [camRotation, setCamRotation] = useState([0, 0, 0])
   const [nextCamRotation, setNextCamRotation] = useState(camRotation)
@@ -71,10 +72,13 @@ const SceneContent = () =>  {
     immediate: false,
     onRest: () => {
       const restPos = camSpring.position.get()
-      const currentPos = [restPos[0], playerHeight, restPos[2]] 
+      const currentPos = [restPos[0], playerHeight, restPos[2]]
+      console.log(`current pos: ${currentPos} camera pos: ${cameraRef.current.position.toArray()}`)
       setCamPosition(currentPos)
       const restRot = camSpring.rotation.get()
       setCamRotation(restRot)
+
+      //cameraRef.current.rotation.set(restRot[0], restRot[1], restRot[2])
     }
     
   }), [camPosition, nextCamPosition, camRotation, nextCamRotation])
@@ -117,10 +121,16 @@ const SceneContent = () =>  {
   }], [target]);
   
   
-  const whichPunch = (worldPoint) => {
-    const localPoint = worldPoint.clone().applyMatrix4(boboRef.current.matrixWorld);
-    const isRightSide = localPoint.x > 0;
-    return isRightSide ? 1 : 0;
+  const shouldPunchRight = (worldPoint) => {
+    const camPos = camSpring.position.get()
+    const camVec = new Vector3(camPos[0], camPos[1], camPos[2])
+    const boboToCamera = camVec.clone().sub(boboRef.current.position)
+    const up = new Vector3(0, 1, 0)
+    const right = up.clone().cross(boboToCamera)
+    const cameraToPoint = new Vector3(worldPoint.x, camPos.y, worldPoint.z).sub(camVec)
+    const dot = right.dot(cameraToPoint)
+    const isRight = dot > 0
+    return isRight;
   };
 
   const startPunchingState = (key) => {
@@ -164,21 +174,29 @@ const SceneContent = () =>  {
     return null
   }
 
+  const cameraOffset = (vec) => {
+    const camLocalCoords = cameraRef.current.worldToLocal(vec)
+    console.log(camLocalCoords)
+    const offset = [0, camOrigin[1] - gloveOrigins.left[1], camOrigin[2] - gloveOrigins.left[2]]
+    const newCoords = [camLocalCoords.x, camLocalCoords.y - offset[1], camLocalCoords.z]
+    console.log(`new ctarget oords: ${newCoords}`)
+    return camLocalCoords.toArray()
+  }
+
   const handleBoboClick = (event) => {
     event.stopPropagation()
     console.log('bobo clicked')
     target = getRaycastHit(raycaster, event, cameraRef.current, boboRef)
     if (target) {
-      //console.log(`hit ${target.toArray()}`)
-      const shouldPunchRight = whichPunch(target)
-      if (shouldPunchRight) {
+      console.log(`hit ${target.toArray()}`)
+      if (shouldPunchRight(target)) {
         if (!punching.right) {
-          setRightTarget(target.toArray())
+          setRightTarget(cameraOffset(target))
           startPunchingState(1)
         }
       } else {
         if (!punching.left) {
-          setLeftTarget(target.toArray())
+          setLeftTarget(cameraOffset(target))
           startPunchingState(0)
         }
       }

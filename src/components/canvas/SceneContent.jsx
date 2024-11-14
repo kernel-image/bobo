@@ -1,6 +1,6 @@
 'use client'
 
-import { useSpring, useSprings, animated } from '@react-spring/three'
+import { useSpring, useSprings, animated, config } from '@react-spring/three'
 import { useGLTF, PerspectiveCamera } from '@react-three/drei'
 import { useEffect, useRef, useState} from 'react'
 import { Euler, MeshStandardMaterial, Quaternion, Vector3 } from 'three'
@@ -62,13 +62,7 @@ const SceneContent = () =>  {
   const [camSpring, camSpringApi] = useSpring(() => ({
     from: { position: camPosition, rotation: camRotation},
     to: { position: nextCamPosition, rotation: nextCamRotation},
-    config: {
-      mass: 1,
-      tension: 200,
-      friction: 10,
-      velocity: .02,
-      precision: 0.4
-    },
+    config: config.molasses,
     immediate: false,
     onRest: () => {
       const restPos = camSpring.position.get()
@@ -82,8 +76,21 @@ const SceneContent = () =>  {
     
   }), [camPosition, nextCamPosition, camRotation, nextCamRotation])
 
+  //idle hands spring
+  const [idleHands, idleHandsApi] = useSpring(() => ({
+    from: { position: [0, 0, 0], rotation: [0, Math.PI / 80, Math.PI / 100]},
+    to: { position: [0, -0.1, 0], rotation: [0, Math.PI / -80, Math.PI / -100]},
+    loop: {reverse: true},
+    config: {
+      mass: 1,
+      tension: 15,
+      friction: 1,
+      precision: 0.0035,
+    },
+  }), [])
 
-  //glove spring
+
+  //punch spring
   let target = new Vector3();
   const [leftTarget, setLeftTarget] = useState(gloveOrigins.left);
   const [rightTarget, setRightTarget] = useState(gloveOrigins.right);
@@ -137,6 +144,7 @@ const SceneContent = () =>  {
 
   const stopPunchingState = (key) => {
     punching[key] = false;
+
     if (key) {
       if (rightTarget.some((value, index) => value !== gloveOrigins.right[index])) {
         setRightTarget(gloveOrigins.right)
@@ -230,6 +238,7 @@ const getNextRotation = (nextPos, lookTargetPos) => {
 
     <animated.group position={camSpring.position} rotation = {camSpring.rotation}>
       <PerspectiveCamera makeDefault fov={90} ref={cameraRef}>
+        <animated.group position={idleHands.position} rotation={idleHands.rotation}>
           {/*Right Glove*/}
           <animated.instancedMesh
             args={[boxingGlove.geometry, gloveMaterial, 2]}
@@ -244,6 +253,7 @@ const getNextRotation = (nextPos, lookTargetPos) => {
             position={springs[0].position}
             scale={0.025}
           />
+        </animated.group>
       </PerspectiveCamera>
     </animated.group>
 

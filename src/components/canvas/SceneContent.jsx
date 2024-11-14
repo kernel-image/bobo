@@ -3,7 +3,7 @@
 import { useSpring, useSprings, animated } from '@react-spring/three'
 import { useGLTF, PerspectiveCamera } from '@react-three/drei'
 import { useEffect, useRef, useState} from 'react'
-import { MeshStandardMaterial, Vector3 } from 'three'
+import { Euler, MeshStandardMaterial, Quaternion, Vector3 } from 'three'
 import { useThree } from '@react-three/fiber'
 
 
@@ -56,9 +56,11 @@ const SceneContent = () =>  {
   //camera spring
   const [camPosition, setCamPosition] = useState([0, playerHeight, 1.5]);
   const [nextCamPosition, setNextCamPosition] = useState(camPosition)
+  const [camRotation, setCamRotation] = useState([0, 0, 0])
+  const [nextCamRotation, setNextCamRotation] = useState(camRotation)
   const [camSpring, camSpringApi] = useSpring(() => ({
-    from: { position: camPosition},
-    to: { position: nextCamPosition},
+    from: { position: camPosition, rotation: camRotation},
+    to: { position: nextCamPosition, rotation: nextCamRotation},
     config: {
       mass: 1,
       tension: 200,
@@ -71,14 +73,12 @@ const SceneContent = () =>  {
       const restPos = camSpring.position.get()
       const currentPos = [restPos[0], playerHeight, restPos[2]] 
       setCamPosition(currentPos)
+      const restRot = camSpring.rotation.get()
+      setCamRotation(restRot)
     }
     
-  }), [camPosition, nextCamPosition])
+  }), [camPosition, nextCamPosition, camRotation, nextCamRotation])
 
-  useEffect(() => {
-    const cam = cameraRef.current
-    cam.lookAt(boboRef.current.position)
-  }, [camPosition])
 
   //glove spring
   let target = new Vector3();
@@ -194,16 +194,30 @@ const SceneContent = () =>  {
         const nextPos = [target.x, playerHeight, target.z]
         console.log(`move to ${nextPos}`)
         setNextCamPosition(nextPos)
+        const nextRotation = getNextRotation(nextPos, boboRef.current.position)
+        console.log(`next rotation: ${nextRotation}`)
+        setNextCamRotation(nextRotation)
       }
     }
   }
+
+const getNextRotation = (nextPos, lookTargetPos) => {
+  const nextPosVector = new Vector3(nextPos[0], nextPos[1], nextPos[2])
+  const cameraForwardVector = new Vector3(0, 0, -1); // camera's local forward vector
+  const cameraUpVector = new Vector3(0, 1, 0); // camera's local up vector
+  const targetDirection = new Vector3().subVectors(lookTargetPos, nextPosVector).normalize();
+  const targetQuaternion = new Quaternion();
+  targetQuaternion.setFromUnitVectors(cameraForwardVector, targetDirection, cameraForwardVector);
+  const nextRotationEuler = new Euler().setFromQuaternion(targetQuaternion);
+  return [0, nextRotationEuler.y, 0]
+}
 
 
 
   return (
     <group>
 
-    <animated.group position={camSpring.position}>
+    <animated.group position={camSpring.position} rotation = {camSpring.rotation}>
       <PerspectiveCamera makeDefault fov={90} ref={cameraRef}>
           {/*Right Glove*/}
           <animated.instancedMesh

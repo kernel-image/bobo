@@ -73,12 +73,11 @@ const SceneContent = () =>  {
     onRest: () => {
       const restPos = camSpring.position.get()
       const currentPos = [restPos[0], playerHeight, restPos[2]]
-      console.log(`current pos: ${currentPos} camera pos: ${cameraRef.current.position.toArray()}`)
+      //ref properties are not updated automatically
+      //console.log(`current pos: ${currentPos} camera pos: ${cameraRef.current.position.toArray()}`)
       setCamPosition(currentPos)
       const restRot = camSpring.rotation.get()
       setCamRotation(restRot)
-
-      //cameraRef.current.rotation.set(restRot[0], restRot[1], restRot[2])
     }
     
   }), [camPosition, nextCamPosition, camRotation, nextCamRotation])
@@ -107,7 +106,6 @@ const SceneContent = () =>  {
   {
     from: { position: gloveOrigins.right },
     to: [{ position: rightTarget}, {position: gloveOrigins.right}],
-    //loop: { reverse: true },
     config: {
       mass: 1,
       tension: 500,
@@ -139,7 +137,6 @@ const SceneContent = () =>  {
 
   const stopPunchingState = (key) => {
     punching[key] = false;
-    //console.log(`${key? 'right' : 'left'} punch ended`)
     if (key) {
       if (rightTarget.some((value, index) => value !== gloveOrigins.right[index])) {
         setRightTarget(gloveOrigins.right)
@@ -176,10 +173,6 @@ const SceneContent = () =>  {
 
   const cameraOffset = (vec) => {
     const camLocalCoords = cameraRef.current.worldToLocal(vec)
-    console.log(camLocalCoords)
-    const offset = [0, camOrigin[1] - gloveOrigins.left[1], camOrigin[2] - gloveOrigins.left[2]]
-    const newCoords = [camLocalCoords.x, camLocalCoords.y - offset[1], camLocalCoords.z]
-    console.log(`new ctarget oords: ${newCoords}`)
     return camLocalCoords.toArray()
   }
 
@@ -188,7 +181,7 @@ const SceneContent = () =>  {
     console.log('bobo clicked')
     target = getRaycastHit(raycaster, event, cameraRef.current, boboRef)
     if (target) {
-      console.log(`hit ${target.toArray()}`)
+      //console.log(`hit ${target.toArray()}`)
       if (shouldPunchRight(target)) {
         if (!punching.right) {
           setRightTarget(cameraOffset(target))
@@ -210,10 +203,10 @@ const SceneContent = () =>  {
       target = getRaycastHit(raycaster, event, cameraRef.current, floorRef)
       if (target) {
         const nextPos = [target.x, playerHeight, target.z]
-        console.log(`move to ${nextPos}`)
+        //console.log(`move to ${nextPos}`)
         setNextCamPosition(nextPos)
         const nextRotation = getNextRotation(nextPos, boboRef.current.position)
-        console.log(`next rotation: ${nextRotation}`)
+        //console.log(`next rotation: ${nextRotation}`)
         setNextCamRotation(nextRotation)
       }
     }
@@ -225,7 +218,7 @@ const getNextRotation = (nextPos, lookTargetPos) => {
   const cameraUpVector = new Vector3(0, 1, 0); // camera's local up vector
   const targetDirection = new Vector3().subVectors(lookTargetPos, nextPosVector).normalize();
   const targetQuaternion = new Quaternion();
-  targetQuaternion.setFromUnitVectors(cameraForwardVector, targetDirection, cameraForwardVector);
+  targetQuaternion.setFromUnitVectors(cameraForwardVector, targetDirection, cameraUpVector);
   const nextRotationEuler = new Euler().setFromQuaternion(targetQuaternion);
   return [0, nextRotationEuler.y, 0]
 }

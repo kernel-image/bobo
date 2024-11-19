@@ -4,7 +4,7 @@ import { useSpring, useSprings, animated, config } from '@react-spring/three'
 import { useGLTF, PerspectiveCamera } from '@react-three/drei'
 import { useEffect, useRef, useState} from 'react'
 import { MeshStandardMaterial, Vector3 } from 'three'
-import { useThree } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { Physics, RigidBody, MeshCollider, BallCollider } from '@react-three/rapier'
 import { rotateAroundPoint } from '@/helpers/rotateAroundPoint'
 
@@ -18,6 +18,7 @@ const SceneContent = () =>  {
   const boboRB = useRef(null);
   const { raycaster } = useThree();
   let punching = [false, false]
+  const BOBO_MASS = 25
 
   ////////////////////////////
   //loaders
@@ -157,16 +158,10 @@ const SceneContent = () =>  {
       if (rightTarget.some((value, index) => value !== gloveOrigins.right[index])) {
         setRightTarget(gloveOrigins.right)
       }
-      else{
-        //console.log("right hand at rest")
-      }
       
     } else {
       if (leftTarget.some((value, index) => value !== gloveOrigins.left[index])) {
         setLeftTarget(gloveOrigins.left)
-      }
-      else{
-        //console.log("left hand at rest")
       }
     }
   }
@@ -209,19 +204,26 @@ const SceneContent = () =>  {
     }
   }
 
-  const handleLevelClick = (event) => {
+  const handleLevelClick = (event, naviagateToPoint) => {
     event.stopPropagation()
     //console.log('level clicked')
     if (!punching.right && !punching.left) {
-      target = getRaycastHit(raycaster, event, cameraRef.current, floorRef)
-      if (target) {
-        const nextPos = [target.x, playerHeight, target.z]
-        //console.log(`move to ${nextPos}`)
+      let nextPos;
+      if (naviagateToPoint) {
+        target = getRaycastHit(raycaster, event, cameraRef.current, floorRef)
+        if (target) {
+          nextPos = [target.x, playerHeight, target.z]
+          //console.log(`move to ${nextPos}`)
+          setNextCamPosition(nextPos)
+        }
+      }else{
+        //recenter
+        nextPos = [0, playerHeight, 0]
         setNextCamPosition(nextPos)
-        const nextRotation = getNextRotation(nextPos, boboRB.current.translation())
-        //console.log(`next rotation: ${nextRotation}`)
-        setNextCamRotation(nextRotation)
       }
+      const nextRotation = getNextRotation(nextPos, boboRB.current.translation())
+      //console.log(`next rotation: ${nextRotation}`)
+      setNextCamRotation(nextRotation)
     }
   }
 
@@ -264,6 +266,13 @@ const SceneContent = () =>  {
 
   const handleCollision = (e) => {
     console.log(`${e.other.rigidBodyObject.name} hit ${e.target.rigidBodyObject.name}`)
+    /*
+    if (e.other.rigidBodyObject.name === 'floor') {
+      const angularVelocity = boboRB.current.angvel()
+      const inverseVelocity = { x: angularVelocity.x * -1, y: angularVelocity.y * -1, z: angularVelocity.z * -1 }
+      boboRB.current.applyTorqueImpulse(inverseVelocity, true);
+    }
+      */
   }
 
   const calcCylinderAngularInertia = (radius, height, mass) => {
@@ -286,12 +295,11 @@ const SceneContent = () =>  {
     if (boboRB.current) {
       //boboRB.current.colliderSet.forEach((collider) => collider.density(3))
       const collider = boboRB.current.colliderSet.getAll()[0]
-      const newMass = 40.0
       boboRB.current.colliderSet.forEach((collider) =>
         collider.setMassProperties(
-          newMass, //mass
+          BOBO_MASS, //mass
           boboRB.current.translation(), //centerOfMass
-          getBoboAngularInertia(newMass), //principalAngularInertia
+          getBoboAngularInertia(BOBO_MASS), //principalAngularInertia
           { w: 1.0, x: 0.0, y: 0.0, z: 0.0 } //angularInertiaLocalFrame
         ),
       )
@@ -369,6 +377,8 @@ const SceneContent = () =>  {
             </MeshCollider>
           ))}
         </RigidBody>
+
+
       </Physics>
 
       {/*Level Geometry*/}
@@ -379,7 +389,7 @@ const SceneContent = () =>  {
             key={obj.name}
             object={obj}
             material={levelMaterial}
-            onClick={isFloor ? handleLevelClick : null}
+            onClick={ (e) => handleLevelClick(e, isFloor) }
             ref={isFloor ? floorRef : null}
           />
         )

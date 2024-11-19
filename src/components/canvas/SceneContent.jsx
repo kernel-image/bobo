@@ -48,7 +48,7 @@ const SceneContent = () =>  {
   //////////////////////////
   const levelMaterial = new MeshStandardMaterial({ color: '#333333' });
   const gloveMaterial = new MeshStandardMaterial({ color: 'red', wireframe: true});
-  const testMaterial = new MeshStandardMaterial({ color: 'green', wireframe: true});
+  const testMaterial = new MeshStandardMaterial({ color: 'green', alphaTest: 2});
 
 
   ////////////////////////////

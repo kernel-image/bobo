@@ -22,7 +22,7 @@ const SceneContent = () =>  {
   const boboRB = useRef(null);
   const camRB = useRef(null);
   const { raycaster } = useThree();
-  
+
   let punching = [false, false]
 
 
@@ -54,7 +54,7 @@ const SceneContent = () =>  {
   //materials
   //////////////////////////
   const levelMaterial = new MeshStandardMaterial({ color: '#333333' });
-  const gloveMaterial = new MeshStandardMaterial({ color: 'red', wireframe: true});
+  const gloveMaterial = new MeshStandardMaterial({ color: 'red'});
   const testMaterial = new MeshStandardMaterial({ color: 'green', alphaTest: 2});
 
 
@@ -120,11 +120,11 @@ const SceneContent = () =>  {
   const [leftTarget, setLeftTarget] = useState(gloveOrigins.left);
   const [rightTarget, setRightTarget] = useState(gloveOrigins.right);
   const gloveSpringConfig = {
-    mass: 2,
-    tension: 900,
+    mass: 1,
+    tension: 400,
     friction: 10,
     velocity: .01,
-    precision: 0.3
+    precision: 0.2
   }
 
   const [springs, springsApi] = useSprings(2,[{
@@ -316,16 +316,14 @@ const SceneContent = () =>  {
   let torque = 0;
   useFrame((state, delta) => {
       rotation = boboRB.current.rotation()
-      console.log(rotation)
-      if (Math.abs(rotation.x) < 0.025 && Math.abs(rotation.z) < 0.025) {
+      angularVelocity = boboRB.current.angvel();
+      if (Math.abs(rotation.x) < 0.025 && Math.abs(rotation.z) < 0.025 || Math.abs(angularVelocity.x) > 1 || Math.abs(angularVelocity.z) > 1){
         boboRB.current.resetTorques();
-        console.log(rotation)
       }else{
         objUpWorld = WORLD_UP_VECTOR.clone().applyEuler(new Euler(rotation.x, rotation.y, rotation.z, 'XYZ'));
         axis = new Vector3().crossVectors( objUpWorld, WORLD_UP_VECTOR );
         angle = Math.acos(objUpWorld.dot(WORLD_UP_VECTOR));
-        torque = axis.clone().multiplyScalar(angle * delta * 250);
-        angularVelocity = boboRB.current.angvel();
+        torque = axis.clone().multiplyScalar(angle * delta * 500);
         boboRB.current.addTorque({ x: torque.x + angularVelocity.x * -1, y: 0, z: torque.z + angularVelocity.z * -1}, true);
       }
   })

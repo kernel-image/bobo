@@ -3,22 +3,28 @@
 import { useSpring, useSprings, animated, config } from '@react-spring/three'
 import { useGLTF, PerspectiveCamera } from '@react-three/drei'
 import { useEffect, useRef, useState} from 'react'
-import { MeshStandardMaterial, Vector3 } from 'three'
+import { MeshStandardMaterial, Vector3, Euler } from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Physics, RigidBody, MeshCollider, BallCollider } from '@react-three/rapier'
 import { rotateAroundPoint } from '@/helpers/rotateAroundPoint'
 
 const SceneContent = () =>  {
-  const playerHeight = 1.5
+  const PLAYER_HEIGHT = 1.5
+  const BOBO_MASS = 4;
+  const GLOVE_MASS = 50;
+  const WORLD_UP_VECTOR = new Vector3(0, 1, 0);
+
   const boboRef = useRef(null);
   const cameraRef = useRef(null);
   const floorRef = useRef(null);
   const gloveLeftRB = useRef(null);
   const gloveRightRB = useRef(null);
   const boboRB = useRef(null);
+  const camRB = useRef(null);
   const { raycaster } = useThree();
+  
   let punching = [false, false]
-  const BOBO_MASS = 25
+
 
   ////////////////////////////
   //loaders
@@ -73,7 +79,7 @@ const SceneContent = () =>  {
   /////////////////////////////////
 
   //camera spring
-  const camOrigin = [0, playerHeight, 1.5]
+  const camOrigin = [0, PLAYER_HEIGHT, 1.5]
   const [camPosition, setCamPosition] = useState(camOrigin);
   const [nextCamPosition, setNextCamPosition] = useState(camPosition)
   const [camRotation, setCamRotation] = useState([0, 0, 0])
@@ -86,7 +92,7 @@ const SceneContent = () =>  {
     onChange: () => updateKinematicObjects(),
     onRest: () => {
       const restPos = camSpring.position.get()
-      const currentPos = [restPos[0], playerHeight, restPos[2]]
+      const currentPos = [restPos[0], PLAYER_HEIGHT, restPos[2]]
       //ref properties are not updated automatically
       //console.log(`current pos: ${currentPos} camera pos: ${cameraRef.current.position.toArray()}`)
       setCamPosition(currentPos)
@@ -115,7 +121,7 @@ const SceneContent = () =>  {
   const [rightTarget, setRightTarget] = useState(gloveOrigins.right);
   const gloveSpringConfig = {
     mass: 2,
-    tension: 500,
+    tension: 900,
     friction: 10,
     velocity: .01,
     precision: 0.3
@@ -212,13 +218,13 @@ const SceneContent = () =>  {
       if (naviagateToPoint) {
         target = getRaycastHit(raycaster, event, cameraRef.current, floorRef)
         if (target) {
-          nextPos = [target.x, playerHeight, target.z]
+          nextPos = [target.x, PLAYER_HEIGHT, target.z]
           //console.log(`move to ${nextPos}`)
           setNextCamPosition(nextPos)
         }
       }else{
         //recenter
-        nextPos = [0, playerHeight, 0]
+        nextPos = [0, PLAYER_HEIGHT, 0]
         setNextCamPosition(nextPos)
       }
       const nextRotation = getNextRotation(nextPos, boboRB.current.translation())
@@ -242,37 +248,31 @@ const SceneContent = () =>  {
   //physics handlers
   /////////////////////////
   const updateKinematicObjects = () => {
-    if (true) {
-      const camPos = camSpring.position.get()
-      //console.log(`camera position: ${camPos}`)
-      const rightGlovePos = springs[1].position.get()
-      const rightGloveWorldPos = cameraRef
-      //console.log(rightGlovePos)
-      const nextPosRightGlove = rotateAroundPoint({x: rightGlovePos[0] + camPos[0], y:  rightGlovePos[1] + camPos[1], z: rightGlovePos[2] + camPos[2]},
-      {x: camPos[0], y: camPos[1], z: camPos[2]}, [0, camSpring.rotation.get()[1], 0])
-
-      //console.log(nextPosRightGlove)
-      gloveRightRB.current.setNextKinematicTranslation(nextPosRightGlove)
-      //console.log('right glove position:')
-      //console.log(gloveRightRB.current.translation())
-      const leftGlovePos = springs[0].position.get()
-      //console.log(leftGlovePos)
-      const nextPosLeftGlove = rotateAroundPoint({x: leftGlovePos[0]+ camPos[0], y: leftGlovePos[1] + camPos[1], z: leftGlovePos[2] + camPos[2]},
-      {x: camPos[0], y: camPos[1], z: camPos[2]}, [0, camSpring.rotation.get()[1], 0])
-      //console.log(nextPosLeftGlove)
-      gloveLeftRB.current.setNextKinematicTranslation(nextPosLeftGlove)
-    }
+    const camPos = camSpring.position.get()
+    camRB.current.setNextKinematicTranslation({x: camPos[0], y: camPos[1], z: camPos[2]})
+    //console.log(`camera position: ${camPos}`)
+    const rightGlovePos = springs[1].position.get()
+    const rightGloveWorldPos = cameraRef
+    //console.log(rightGlovePos)
+    const nextPosRightGlove = rotateAroundPoint({x: rightGlovePos[0] + camPos[0], y:  rightGlovePos[1] + camPos[1], z: rightGlovePos[2] + camPos[2]},
+    {x: camPos[0], y: camPos[1], z: camPos[2]}, [0, camSpring.rotation.get()[1], 0])
+    //console.log(nextPosRightGlove)
+    gloveRightRB.current.setNextKinematicTranslation(nextPosRightGlove)
+    //console.log('right glove position:')
+    //console.log(gloveRightRB.current.translation())
+    const leftGlovePos = springs[0].position.get()
+    //console.log(leftGlovePos)
+    const nextPosLeftGlove = rotateAroundPoint({x: leftGlovePos[0]+ camPos[0], y: leftGlovePos[1] + camPos[1], z: leftGlovePos[2] + camPos[2]},
+    {x: camPos[0], y: camPos[1], z: camPos[2]}, [0, camSpring.rotation.get()[1], 0])
+    //console.log(nextPosLeftGlove)
+    gloveLeftRB.current.setNextKinematicTranslation(nextPosLeftGlove)
+    
   }
 
   const handleCollision = (e) => {
     console.log(`${e.other.rigidBodyObject.name} hit ${e.target.rigidBodyObject.name}`)
-    /*
-    if (e.other.rigidBodyObject.name === 'floor') {
-      const angularVelocity = boboRB.current.angvel()
-      const inverseVelocity = { x: angularVelocity.x * -1, y: angularVelocity.y * -1, z: angularVelocity.z * -1 }
-      boboRB.current.applyTorqueImpulse(inverseVelocity, true);
-    }
-      */
+    //console.log(e)
+  
   }
 
   const calcCylinderAngularInertia = (radius, height, mass) => {
@@ -290,6 +290,7 @@ const SceneContent = () =>  {
     return calcCylinderAngularInertia(radius, height, mass)
   }
 
+
   //initialize bobo rigidbody mass properties
   useEffect(() => {
     if (boboRB.current) {
@@ -306,6 +307,28 @@ const SceneContent = () =>  {
     }
   }, [boboRB])
 
+  //bobo self balancing forces
+  let angularVelocity = { x: 0, y: 0, z: 0 }
+  let rotation = { x: 0, y: 0, z: 0 };
+  let axis = new Vector3();
+  let objUpWorld = new Vector3();
+  let angle = 0;
+  let torque = 0;
+  useFrame((state, delta) => {
+      rotation = boboRB.current.rotation()
+      console.log(rotation)
+      if (Math.abs(rotation.x) < 0.025 && Math.abs(rotation.z) < 0.025) {
+        boboRB.current.resetTorques();
+        console.log(rotation)
+      }else{
+        objUpWorld = WORLD_UP_VECTOR.clone().applyEuler(new Euler(rotation.x, rotation.y, rotation.z, 'XYZ'));
+        axis = new Vector3().crossVectors( objUpWorld, WORLD_UP_VECTOR );
+        angle = Math.acos(objUpWorld.dot(WORLD_UP_VECTOR));
+        torque = axis.clone().multiplyScalar(angle * delta * 250);
+        angularVelocity = boboRB.current.angvel();
+        boboRB.current.addTorque({ x: torque.x + angularVelocity.x * -1, y: 0, z: torque.z + angularVelocity.z * -1}, true);
+      }
+  })
 
   return (
     <group>
@@ -331,11 +354,14 @@ const SceneContent = () =>  {
         </animated.group>
 
         {/* Kinematic Rigidbodies */}
-        <RigidBody name='leftHand' type='kinematicPosition' ref={gloveLeftRB} ccd={true}>
-          <BallCollider args={[0.2]} />
+        <RigidBody name='leftHand' type='kinematicPosition' ref={gloveLeftRB} ccd={true} mass={GLOVE_MASS}>
+          <BallCollider args={[0.25]} />
         </RigidBody>
-        <RigidBody name='rightHand' type='kinematicPosition' ref={gloveRightRB} ccd={true}>
-          <BallCollider args={[0.2]} />
+        <RigidBody name='rightHand' type='kinematicPosition' ref={gloveRightRB} ccd={true} mass={GLOVE_MASS}>
+          <BallCollider args={[0.25]} />
+        </RigidBody>
+        <RigidBody name='camRB' type='kinematicPosition' ref={camRB}>
+          <BallCollider args={[1]} />
         </RigidBody>
 
         {/*Bobo*/}
@@ -344,10 +370,10 @@ const SceneContent = () =>  {
           type='dynamic'
           colliders={false}
           position={[0, 0.001, -2]}
-          restitution={0.7}
+          restitution={0.6}
           friction={0.1}
-          linearDamping={0.9}
-          angularDamping={0.1}
+          linearDamping={0.5}
+          angularDamping={0.6}
           ccd={true}
           onCollisionEnter={handleCollision}
           ref={boboRB}
@@ -370,8 +396,8 @@ const SceneContent = () =>  {
               args={[0.5, 1]}
               position={[0, 0.75, 0]}
               centerOfMass={[0, 0, 0]}
-              restitution={0.3}
-              friction={0.3}
+              restitution={0.1}
+              friction={0.5}
             >
               <primitive object={obj} material={testMaterial} />
             </MeshCollider>

@@ -2,11 +2,13 @@
 
 import { useSpring, useSprings, animated, config } from '@react-spring/three'
 import { useGLTF, PerspectiveCamera } from '@react-three/drei'
-import { useEffect, useRef, useState} from 'react'
+import { useEffect, useMemo, useRef, useState} from 'react'
 import { MeshStandardMaterial, Vector3, Euler } from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Physics, RigidBody, MeshCollider, BallCollider } from '@react-three/rapier'
 import { rotateAroundPoint } from '@/helpers/rotateAroundPoint'
+import { remap } from '@/helpers/Remap'
+//import { playSFX } from '@/helpers/AudioManager'
 
 const SceneContent = () =>  {
   const PLAYER_HEIGHT = 1.5
@@ -24,6 +26,9 @@ const SceneContent = () =>  {
   const { raycaster } = useThree();
 
   let punching = [false, false]
+  const [swings, setSwings] = useState(0)
+  const [points, setPoints] = useState(0)
+
 
 
   ////////////////////////////
@@ -88,7 +93,6 @@ const SceneContent = () =>  {
     from: { position: camPosition, rotation: camRotation},
     to: { position: nextCamPosition, rotation: nextCamRotation},
     config: config.molasses,
-    immediate: false,
     onChange: () => updateKinematicObjects(),
     onRest: () => {
       const restPos = camSpring.position.get()
@@ -131,14 +135,14 @@ const SceneContent = () =>  {
     from: { position: gloveOrigins.left },
     to: [{ position: leftTarget }, {position: gloveOrigins.left}],
     config: gloveSpringConfig,
-    onChange: () => updateKinematicObjects(),
+    onChange: () => {updateKinematicObjects(); startPunchingState(0)},
     onRest: () => stopPunchingState(0),
   },
   {
     from: { position: gloveOrigins.right },
     to: [{ position: rightTarget}, {position: gloveOrigins.right}],
     config: gloveSpringConfig,
-    onChange: () => updateKinematicObjects(),
+    onChange: () => {updateKinematicObjects(); startPunchingState(1)},
     onRest: () => stopPunchingState(1),
   }], [target]);
 
@@ -159,15 +163,21 @@ const SceneContent = () =>  {
   }
 
   const stopPunchingState = (key) => {
-    punching[key] = false;
+    
     if (key) {
       if (rightTarget.some((value, index) => value !== gloveOrigins.right[index])) {
         setRightTarget(gloveOrigins.right)
+      }
+      else{
+        punching[key] = false;
       }
       
     } else {
       if (leftTarget.some((value, index) => value !== gloveOrigins.left[index])) {
         setLeftTarget(gloveOrigins.left)
+      }
+      else{
+        punching[key] = false;
       }
     }
   }
@@ -199,12 +209,12 @@ const SceneContent = () =>  {
       if (shouldPunchRight(target)) {
         if (!punching[1]) {
           setRightTarget(cameraOffset(target))
-          startPunchingState(1)
+          setSwings(swings + 1)
         }
       } else {
         if (!punching[0]) {
           setLeftTarget(cameraOffset(target))
-          startPunchingState(0)
+          setSwings(swings + 1)
         }
       }
     }
@@ -252,7 +262,6 @@ const SceneContent = () =>  {
     camRB.current.setNextKinematicTranslation({x: camPos[0], y: camPos[1], z: camPos[2]})
     //console.log(`camera position: ${camPos}`)
     const rightGlovePos = springs[1].position.get()
-    const rightGloveWorldPos = cameraRef
     //console.log(rightGlovePos)
     const nextPosRightGlove = rotateAroundPoint({x: rightGlovePos[0] + camPos[0], y:  rightGlovePos[1] + camPos[1], z: rightGlovePos[2] + camPos[2]},
     {x: camPos[0], y: camPos[1], z: camPos[2]}, [0, camSpring.rotation.get()[1], 0])
@@ -270,10 +279,34 @@ const SceneContent = () =>  {
   }
 
   const handleCollision = (e) => {
-    console.log(`${e.other.rigidBodyObject.name} hit ${e.target.rigidBodyObject.name}`)
-    //console.log(e)
-  
+    //console.log(`${e.other.rigidBodyObject.name} hit ${e.target.rigidBodyObject.name}`)
   }
+
+  const handleBoboContactForce = (e) => {
+    if (e.rigidBodyObject.name === 'rightHand' || e.rigidBodyObject.name === 'leftHand') { 
+      if (punching.some((value) => value === true)) {
+        //console.log(e.totalForce)
+        const punchForce = e.totalForceMagnitude
+        console.log(`punch force: ${punchForce}`) // getting ranges 0-22000 but avg is 300-3000
+        if (punchForce > 3000) {
+          setPoints(points + 1)
+        }else if (punchForce > 2000) {
+          setPoints(points + 0.75)
+        }else if (punchForce > 1000) {
+          setPoints(points + 0.5)
+        }else if (punchForce > 300) {
+          setPoints(points + 0.25)
+        }else{
+          setPoints(points + 0.1)
+        }
+        //playSFX('punch', remap(punchForce, 0, 3000, 0, 1))
+      }
+    }
+  }
+
+  useEffect(() => {
+    console.log(`swings: ${swings} points: ${points}`)
+  }, [swings, points])
 
   const calcCylinderAngularInertia = (radius, height, mass) => {
     //https://en.wikipedia.org/wiki/List_of_moments_of_inertia
@@ -289,7 +322,6 @@ const SceneContent = () =>  {
     const height = size.y;
     return calcCylinderAngularInertia(radius, height, mass)
   }
-
 
   //initialize bobo rigidbody mass properties
   useEffect(() => {
@@ -314,14 +346,15 @@ const SceneContent = () =>  {
   let objUpWorld = new Vector3();
   let angle = 0;
   let torque = 0;
+  let rotationEuler = new Euler(0,0,0,'XYZ');
   useFrame((state, delta) => {
       rotation = boboRB.current.rotation()
       angularVelocity = boboRB.current.angvel();
-      if (Math.abs(rotation.x) < 0.025 && Math.abs(rotation.z) < 0.025 || Math.abs(angularVelocity.x) > 1 || Math.abs(angularVelocity.z) > 1){
+      if (Math.abs(rotation.x) < 0.025 && Math.abs(rotation.z) < 0.025 || Math.abs(angularVelocity.x) > 1.1 || Math.abs(angularVelocity.z) > 1.1){
         boboRB.current.resetTorques();
       }else{
-        objUpWorld = WORLD_UP_VECTOR.clone().applyEuler(new Euler(rotation.x, rotation.y, rotation.z, 'XYZ'));
-        axis = new Vector3().crossVectors( objUpWorld, WORLD_UP_VECTOR );
+        objUpWorld = WORLD_UP_VECTOR.clone().applyEuler(rotationEuler.set(rotation.x, rotation.y, rotation.z));
+        axis.crossVectors( objUpWorld, WORLD_UP_VECTOR );
         angle = Math.acos(objUpWorld.dot(WORLD_UP_VECTOR));
         torque = axis.clone().multiplyScalar(angle * delta * 500);
         boboRB.current.addTorque({ x: torque.x + angularVelocity.x * -1, y: 0, z: torque.z + angularVelocity.z * -1}, true);
@@ -330,27 +363,27 @@ const SceneContent = () =>  {
 
   return (
     <group>
-      <Physics debug>
-        <animated.group position={camSpring.position} rotation={camSpring.rotation}>
-          <PerspectiveCamera makeDefault fov={90} ref={cameraRef}>
-            <animated.group position={idleHands.position} rotation={idleHands.rotation}>
-              {/*Left Glove*/}
-              <animated.mesh
-                args={[boxingGlove.geometry, gloveMaterial, 2]}
-                rotation={[Math.PI * -0.5, Math.PI * 0.8, Math.PI * 0.2]}
-                position={springs[0].position}
-              ></animated.mesh>
-              {/*Right Glove*/}
-              <animated.mesh
-                args={[boxingGlove.geometry, gloveMaterial, 2]}
-                rotation={[Math.PI * -0.25, Math.PI * 1.1, Math.PI * -0.2]}
-                position={springs[1].position}
-                scale={[-1, 1, 1]}
-              ></animated.mesh>
-            </animated.group>
-          </PerspectiveCamera>
-        </animated.group>
-
+      {/* Camera */}
+      <animated.group position={camSpring.position} rotation={camSpring.rotation}>
+        <PerspectiveCamera makeDefault fov={90} ref={cameraRef}>
+          <animated.group position={idleHands.position} rotation={idleHands.rotation}>
+            {/*Left Glove*/}
+            <animated.mesh
+              args={[boxingGlove.geometry, gloveMaterial, 2]}
+              rotation={[Math.PI * -0.5, Math.PI * 0.8, Math.PI * 0.2]}
+              position={springs[0].position}
+            ></animated.mesh>
+            {/*Right Glove*/}
+            <animated.mesh
+              args={[boxingGlove.geometry, gloveMaterial, 2]}
+              rotation={[Math.PI * -0.25, Math.PI * 1.1, Math.PI * -0.2]}
+              position={springs[1].position}
+              scale={[-1, 1, 1]}
+            ></animated.mesh>
+          </animated.group>
+        </PerspectiveCamera>
+      </animated.group>
+      <Physics debug={false}>
         {/* Kinematic Rigidbodies */}
         <RigidBody name='leftHand' type='kinematicPosition' ref={gloveLeftRB} ccd={true} mass={GLOVE_MASS}>
           <BallCollider args={[0.25]} />
@@ -374,6 +407,7 @@ const SceneContent = () =>  {
           angularDamping={0.6}
           ccd={true}
           onCollisionEnter={handleCollision}
+          onContactForce={handleBoboContactForce}
           ref={boboRB}
         >
           <MeshCollider
@@ -388,21 +422,11 @@ const SceneContent = () =>  {
         {/* level colliders */}
         <RigidBody name='level' type='fixed' colliders={false}>
           {levelColliders.map((obj) => (
-            <MeshCollider
-              key={obj.name}
-              type='cuboid'
-              args={[0.5, 1]}
-              position={[0, 0.75, 0]}
-              centerOfMass={[0, 0, 0]}
-              restitution={0.1}
-              friction={0.5}
-            >
+            <MeshCollider key={obj.name} type='cuboid' restitution={0.1} friction={0.5}>
               <primitive object={obj} material={testMaterial} />
             </MeshCollider>
           ))}
         </RigidBody>
-
-
       </Physics>
 
       {/*Level Geometry*/}
@@ -413,7 +437,7 @@ const SceneContent = () =>  {
             key={obj.name}
             object={obj}
             material={levelMaterial}
-            onClick={ (e) => handleLevelClick(e, isFloor) }
+            onClick={(e) => handleLevelClick(e, isFloor)}
             ref={isFloor ? floorRef : null}
           />
         )

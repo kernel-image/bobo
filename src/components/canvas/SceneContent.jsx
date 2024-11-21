@@ -127,6 +127,7 @@ const SceneContent = () =>  {
   //punch spring
   const [leftTarget, setLeftTarget] = useState(GLOVE_ORIGINS.left);
   const [rightTarget, setRightTarget] = useState(GLOVE_ORIGINS.right);
+
   const gloveSpringConfig = {
     mass: 1,
     tension: 400,
@@ -279,23 +280,26 @@ const SceneContent = () =>  {
   /////////////////////////
 
   const updateKinematicObjects = () => {
-    const camPos = camSpring.position.get()
-    camRB.current.setNextKinematicTranslation({x: camPos[0], y: camPos[1], z: camPos[2]})
-    //console.log(`camera position: ${camPos}`)
-    const rightGlovePos = springs[1].position.get()
-    //console.log(rightGlovePos)
-    const nextPosRightGlove = rotateAroundPoint({x: rightGlovePos[0] + camPos[0], y:  rightGlovePos[1] + camPos[1], z: rightGlovePos[2] + camPos[2]},
-    {x: camPos[0], y: camPos[1], z: camPos[2]}, [0, camSpring.rotation.get()[1], 0])
-    //console.log(nextPosRightGlove)
-    gloveRightRB.current.setNextKinematicTranslation(nextPosRightGlove)
-    //console.log('right glove position:')
-    //console.log(gloveRightRB.current.translation())
-    const leftGlovePos = springs[0].position.get()
-    //console.log(leftGlovePos)
-    const nextPosLeftGlove = rotateAroundPoint({x: leftGlovePos[0]+ camPos[0], y: leftGlovePos[1] + camPos[1], z: leftGlovePos[2] + camPos[2]},
-    {x: camPos[0], y: camPos[1], z: camPos[2]}, [0, camSpring.rotation.get()[1], 0])
-    //console.log(nextPosLeftGlove)
-    gloveLeftRB.current.setNextKinematicTranslation(nextPosLeftGlove)
+    //todo: optimize so only necessary objects are updated
+    try{
+      //update camera
+      const camPos = camSpring.position.get()
+      camRB.current.setNextKinematicTranslation({x: camPos[0], y: camPos[1], z: camPos[2]})
+      //update right glove
+      const rightGlovePos = springs[1].position.get()
+      const nextPosRightGlove = rotateAroundPoint({x: rightGlovePos[0] + camPos[0], y:  rightGlovePos[1] + camPos[1], z: rightGlovePos[2] + camPos[2]},
+      {x: camPos[0], y: camPos[1], z: camPos[2]}, [0, camSpring.rotation.get()[1], 0])
+      gloveRightRB.current.setNextKinematicTranslation(nextPosRightGlove)
+      //update left glove
+      const leftGlovePos = springs[0].position.get()
+      const nextPosLeftGlove = rotateAroundPoint({x: leftGlovePos[0]+ camPos[0], y: leftGlovePos[1] + camPos[1], z: leftGlovePos[2] + camPos[2]},
+      {x: camPos[0], y: camPos[1], z: camPos[2]}, [0, camSpring.rotation.get()[1], 0])
+      gloveLeftRB.current.setNextKinematicTranslation(nextPosLeftGlove)
+    }catch(e){
+      const expectedMsg = 'null pointer passed to rust'
+      if (e.message === expectedMsg) return
+      else console.log(e)
+    }
   }
 
 
@@ -325,17 +329,23 @@ const SceneContent = () =>  {
   let torque = 0;
   let rotationEuler = new Euler(0,0,0,'XYZ');
   useFrame((state, delta) => {
-    if (boboRB && boboRB.current) {
-      rotation = boboRB.current.rotation()
-      angularVelocity = boboRB.current.angvel();
-      if (Math.abs(rotation.x) < 0.025 && Math.abs(rotation.z) < 0.025 || Math.abs(angularVelocity.x) > 1.1 || Math.abs(angularVelocity.z) > 1.1){
-        boboRB.current.resetTorques();
-      }else{
-        objUpWorld = WORLD_UP_VECTOR.clone().applyEuler(rotationEuler.set(rotation.x, rotation.y, rotation.z));
-        axis.crossVectors( objUpWorld, WORLD_UP_VECTOR );
-        angle = Math.acos(objUpWorld.dot(WORLD_UP_VECTOR));
-        torque = axis.clone().multiplyScalar(angle * delta * 500);
-        boboRB.current.addTorque({ x: torque.x + angularVelocity.x * -1, y: 0, z: torque.z + angularVelocity.z * -1}, true);
+    if (boboRB && boboRB.current && !ko) {
+      try{
+        rotation = boboRB.current.rotation()
+        angularVelocity = boboRB.current.angvel();
+        if (Math.abs(rotation.x) < 0.025 && Math.abs(rotation.z) < 0.025 || Math.abs(angularVelocity.x) > 1.1 || Math.abs(angularVelocity.z) > 1.1){
+          boboRB.current.resetTorques();
+        }else{
+          objUpWorld = WORLD_UP_VECTOR.clone().applyEuler(rotationEuler.set(rotation.x, rotation.y, rotation.z));
+          axis.crossVectors( objUpWorld, WORLD_UP_VECTOR );
+          angle = Math.acos(objUpWorld.dot(WORLD_UP_VECTOR));
+          torque = axis.clone().multiplyScalar(angle * delta * 500);
+          boboRB.current.addTorque({ x: torque.x + angularVelocity.x * -1, y: 0, z: torque.z + angularVelocity.z * -1}, true);
+        }
+      }catch(e){
+        const expectedMsg = 'null pointer passed to rust'
+        if (e.message === expectedMsg) return
+        else console.log(e)
       }
     }
   })

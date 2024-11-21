@@ -125,7 +125,6 @@ const SceneContent = () =>  {
   }), [])
 
   //punch spring
-  let target = new Vector3();
   const [leftTarget, setLeftTarget] = useState(GLOVE_ORIGINS.left);
   const [rightTarget, setRightTarget] = useState(GLOVE_ORIGINS.right);
   const gloveSpringConfig = {
@@ -149,7 +148,7 @@ const SceneContent = () =>  {
     config: gloveSpringConfig,
     onChange: () => {updateKinematicObjects(); startPunchingState(1)},
     onRest: () => stopPunchingState(1),
-  }], [target]);
+  }], [leftTarget, rightTarget]);
 
   //punch logic
 
@@ -244,7 +243,7 @@ const SceneContent = () =>  {
   const handleBoboClick = (event) => {
     event.stopPropagation()
     //console.log('bobo clicked')
-    target = getRaycastHit(event.pointer, cameraRef.current, boboRef.current)
+    const target = getRaycastHit(event.pointer, cameraRef.current, boboRef.current)
     if (target) {
       //console.log(`hit ${target.toArray()}`)
       if (shouldPunchRight(target)) {
@@ -264,7 +263,7 @@ const SceneContent = () =>  {
     //console.log('level clicked')
     if (punching.every((value) => value === false)) {
       if (naviagateToPoint) {
-        target = getRaycastHit(event.pointer, cameraRef.current, floorRef.current)
+        const target = getRaycastHit(event.pointer, cameraRef.current, floorRef.current)
         if (target) {
           navigateToPoint(target)
         }

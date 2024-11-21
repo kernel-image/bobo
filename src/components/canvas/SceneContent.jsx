@@ -1,14 +1,16 @@
 'use client'
 
 import { useSpring, useSprings, animated, config } from '@react-spring/three'
-import { useGLTF, PerspectiveCamera, Text3D } from '@react-three/drei'
+import { PerspectiveCamera, Text3D } from '@react-three/drei'
 import { useEffect, useRef, useState} from 'react'
-import { MeshStandardMaterial, Vector3, Euler } from 'three'
+import { Vector3, Euler } from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Physics, RigidBody, MeshCollider, BallCollider, CuboidCollider } from '@react-three/rapier'
 import { rotateAroundPoint } from '@/helpers/rotateAroundPoint'
 import { remap } from '@/helpers/Remap'
 import { useSFX, useMusic } from '@/helpers/AudioManager'
+import {useModels} from '@/helpers/gltfLoadingMan'
+import { levelMaterial, gloveMaterial, testMaterial } from '@/helpers/materials'
 
 const SceneContent = () =>  {
   const WORLD_UP_VECTOR = new Vector3(0, 1, 0);
@@ -21,7 +23,6 @@ const SceneContent = () =>  {
     right: [0.5, -0.5, -0.8],
     left: [-0.5, -0.5, -0.8],
   }
-  const font = '/font/CircusOrnate.json'
   const boboRef = useRef(null);
   const cameraRef = useRef(null);
   const floorRef = useRef(null);
@@ -33,8 +34,7 @@ const SceneContent = () =>  {
   const [round, setRound] = useState(0)
   const [swings, setSwings] = useState(0)
   const [points, setPoints] = useState(0)
-  const [respawn, setRespawn] = useState(false)
-  const [showStats, setShowStats] = useState(false)
+  const [ko, setKO] = useState(false)
   const sfx = useSFX()
   const music = useMusic()
   let punching = [false, false]
@@ -45,37 +45,9 @@ const SceneContent = () =>  {
   ////////////////////////////
   //loaders
   //////////////////////////
-  const dracoPath = 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/'
 
-  const { scene: bobo } = useGLTF('/bobo.glb', dracoPath)
-  const { nodes: levelNodes } = useGLTF('/level.glb', dracoPath)
-  const levelMeshes = Object.values(levelNodes).filter((value) => {
-    if (value.name.includes('_mesh')){
-      return value
-    }
-  })
-  const levelColliders = Object.values(levelNodes).filter((value) => {
-    if (value.name.includes('_Collider')){
-      return value
-    }
-  })
-  const {scene: boxingGloveScene } = useGLTF('/player.glb', dracoPath)
-  const boxingGlove = boxingGloveScene.children[0]
-
-  //confirm load
-  if (!bobo || !levelNodes || !boxingGlove) {
-    console.log('loading failure')
-    return null
-  }
-
-
-  ////////////////////////////
-  //materials
-  //////////////////////////
-  const levelMaterial = new MeshStandardMaterial({ color: '#333333' });
-  const gloveMaterial = new MeshStandardMaterial({ color: 'red'});
-  const testMaterial = new MeshStandardMaterial({ color: 'green', alphaTest: 2});
-
+  const models = useModels()
+  const {bobo, levelMeshes, levelColliders, boxingGlove} = models
 
   ////////////////////////////
   // config
@@ -94,24 +66,24 @@ const SceneContent = () =>  {
     setRound(1)
   }, [music])
 
+  //round transition
+
   useEffect(() => {
     console.log(`round ${round}`)
     sfx({id:'bell'});
     //respawn bobo
     if (round > 1) {
-      setRespawn(true)
+      setKO(true)
     }
   }, [round])
 
   useEffect(() => {
-    setShowStats(true);
     const to = setTimeout(() => {
-      setShowStats(false);
-      setRespawn(false);
+      setKO(false);
       sfx({id:'bell'});
     }, 5000);
     return () => clearTimeout(to);
-  }, [respawn])
+  }, [ko])
 
 
   ///////////////////////////////////
@@ -131,8 +103,6 @@ const SceneContent = () =>  {
     onRest: () => {
       const restPos = camSpring.position.get()
       const currentPos = [restPos[0], PLAYER_HEIGHT, restPos[2]]
-      //ref properties are not updated automatically
-      //console.log(`current pos: ${currentPos} camera pos: ${cameraRef.current.position.toArray()}`)
       setCamPosition(currentPos)
       const restRot = camSpring.rotation.get()
       setCamRotation(restRot)
@@ -198,6 +168,25 @@ const SceneContent = () =>  {
     punching[key] = true;
   }
 
+  const onPunch = () => {
+    sfx({id:'whoosh'})
+    setSwings(swings + 1)
+  }
+
+  const punchLeft = (target) => {
+    onPunch()
+    setLeftTarget(cameraOffset(target))
+  }
+
+  const punchRight = (target) => {
+    onPunch()
+    setRightTarget(cameraOffset(target))
+  }
+
+  const cameraOffset = (vec) => {
+    return cameraRef.current.worldToLocal(vec).toArray()
+  }
+
   const stopPunchingState = (key) => {
     console.log("stop punching")
     if (key) {
@@ -218,65 +207,9 @@ const SceneContent = () =>  {
       console.log(`punching ${key ? 'right' : 'left'}: ${punching[key]}`)
     }
   }
+  
 
-
-  ////////////////////////////
-  //click handlers
-  //////////////////////////
-  const getRaycastHit = (raycaster, event, camera, meshRef) => {
-    const screenCoord = event.pointer
-    // Update the raycaster
-    raycaster.setFromCamera(screenCoord, camera)
-    // Check for intersections with the mesh
-    const intersects = raycaster.intersectObject(meshRef.current)
-    if (intersects.length > 0) {
-      const intersection = intersects[0]
-      const worldPoint = intersection.point
-      return worldPoint
-    }
-    return null
-  }
-
-  const onPunch = () => {
-    sfx({id:'whoosh'})
-    setSwings(swings + 1)
-  }
-
-  const handleBoboClick = (event) => {
-    event.stopPropagation()
-    console.log('bobo clicked')
-    target = getRaycastHit(raycaster, event, cameraRef.current, boboRef)
-    if (target) {
-      //console.log(`hit ${target.toArray()}`)
-      if (shouldPunchRight(target)) {
-        if (!punching[1]) {
-          onPunch()
-          setRightTarget(cameraOffset(target))
-        }
-      } else {
-        if (!punching[0]) {
-          onPunch()
-          setLeftTarget(cameraOffset(target))
-
-        }
-      }
-    }
-  }
-
-  const handleLevelClick = (event, naviagateToPoint) => {
-    event.stopPropagation()
-    //console.log('level clicked')
-    if (punching.every((value) => value === false)) {
-      if (naviagateToPoint) {
-        target = getRaycastHit(raycaster, event, cameraRef.current, floorRef)
-        if (target) {
-          navigateToPoint(target)
-        }
-      }else{
-        recenterCamera()
-      }
-    }
-  }
+  //camera logic
 
   const recenterCamera = () => {
     const nextPos = [0, PLAYER_HEIGHT, 0]
@@ -294,20 +227,74 @@ const SceneContent = () =>  {
 
   const lookAtBobo = (nextPos) => {
     console.log("where's bobo?")
-    const nextRotation = getNextRotation(nextPos, boboRB.current.translation())
+    const nextRotation = getLookatRotation(nextPos, boboRB.current.translation())
     //console.log(`next rotation: ${nextRotation}`)
     setNextCamRotation(nextRotation)
   }
 
-  const cameraOffset = (vec) => {
-    return cameraRef.current.worldToLocal(vec).toArray()
-  }
-
-  const getNextRotation = (nextPos, lookTargetPos) => {
-    const nextPosVector = new Vector3(nextPos[0], nextPos[1], nextPos[2])
-    const targetDirection = new Vector3().subVectors(lookTargetPos, nextPosVector).normalize();
+  const getLookatRotation = (lookFromPos, lookTargetVector) => {
+    const lookFromVector = new Vector3(lookFromPos[0], lookFromPos[1], lookFromPos[2])
+    const targetDirection = new Vector3().subVectors(lookTargetVector, lookFromVector).normalize();
     const nextRotation = Math.atan2(-targetDirection.x, -targetDirection.z);
     return [0, nextRotation, 0]
+  }
+
+  const resetPlayer = () => {
+    setNextCamPosition(CAM_ORIGIN)
+    setNextCamRotation([0, 0, 0])
+    setRightTarget(GLOVE_ORIGINS.right)
+    setLeftTarget(GLOVE_ORIGINS.left)
+  }
+
+
+  ////////////////////////////
+  //click handlers
+  //////////////////////////
+  const getRaycastHit = (raycaster, event, camera, meshObj) => {
+    const screenCoord = event.pointer
+    // Update the raycaster
+    raycaster.setFromCamera(screenCoord, camera)
+    // Check for intersections with the mesh
+    const intersects = raycaster.intersectObject(meshObj)
+    if (intersects.length > 0) {
+      const intersection = intersects[0]
+      const worldPoint = intersection.point
+      return worldPoint
+    }
+    return null
+  }
+
+  const handleBoboClick = (event) => {
+    event.stopPropagation()
+    //console.log('bobo clicked')
+    target = getRaycastHit(raycaster, event, cameraRef.current, boboRef.current)
+    if (target) {
+      //console.log(`hit ${target.toArray()}`)
+      if (shouldPunchRight(target)) {
+        if (!punching[1]) {
+          punchRight(target)
+        }
+      } else {
+        if (!punching[0]) {
+          punchLeft(target)
+        }
+      }
+    }
+  }
+
+  const handleLevelClick = (event, naviagateToPoint) => {
+    event.stopPropagation()
+    //console.log('level clicked')
+    if (punching.every((value) => value === false)) {
+      if (naviagateToPoint) {
+        target = getRaycastHit(raycaster, event, cameraRef.current, floorRef.current)
+        if (target) {
+          navigateToPoint(target)
+        }
+      }else{
+        recenterCamera()
+      }
+    }
   }
 
 
@@ -379,6 +366,7 @@ const SceneContent = () =>  {
     if (boboRB.current) {
       //boboRB.current.colliderSet.forEach((collider) => collider.density(3))
       const collider = boboRB.current.colliderSet.getAll()[0]
+      console.log(collider)
       boboRB.current.colliderSet.forEach((collider) =>
         collider.setMassProperties(
           BOBO_MASS, //mass
@@ -429,21 +417,13 @@ const SceneContent = () =>  {
   const handleKillZoneEnter = (e) => {
     if (e.rigidBodyObject.name === 'bobo') {
       console.log('bobo ko')
-      resetPhysics()
+      resetPlayer()
       setRound(round + 1)
       console.log('new round')
     }
     else{
       console.log(`${e.rigidBodyObject.name} hit kill zone`)
     }
-  }
-
-  const resetPhysics = () => {
-    //console.log('reset physics')
-    setNextCamPosition(CAM_ORIGIN)
-    setNextCamRotation([0, 0, 0])
-    setRightTarget(GLOVE_ORIGINS.right)
-    setLeftTarget(GLOVE_ORIGINS.left)
   }
 
   return (
@@ -468,7 +448,7 @@ const SceneContent = () =>  {
           </animated.group>
         </PerspectiveCamera>
       </animated.group>
-      {!respawn &&
+      {!ko &&
       <Physics debug={true}>
         {/* Kinematic Rigidbodies */}
         <RigidBody name='leftHand' type='kinematicPosition' ref={gloveLeftRB} ccd={true} mass={GLOVE_MASS}>
@@ -539,7 +519,7 @@ const SceneContent = () =>  {
 
       {/* UI */}
       {/*<StatsUI round={round} score={points} swings={swings}/>*/}
-      {respawn && <Text3D font={font} size={0.5} position={[-1,1,0]} material={gloveMaterial}>KO</Text3D>}
+      {ko && <Text3D font={'/font/CircusOrnate.json'} size={0.5} position={[-1,1,0]} material={gloveMaterial}>KO</Text3D>}
     </group>
   )
 }

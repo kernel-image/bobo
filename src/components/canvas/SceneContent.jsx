@@ -1,21 +1,27 @@
 'use client'
 
 import { useSpring, useSprings, animated, config } from '@react-spring/three'
-import { useGLTF, PerspectiveCamera } from '@react-three/drei'
-import { useEffect, useMemo, useRef, useState} from 'react'
+import { useGLTF, PerspectiveCamera, Text3D } from '@react-three/drei'
+import { useEffect, useRef, useState} from 'react'
 import { MeshStandardMaterial, Vector3, Euler } from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Physics, RigidBody, MeshCollider, BallCollider } from '@react-three/rapier'
+import { Physics, RigidBody, MeshCollider, BallCollider, CuboidCollider } from '@react-three/rapier'
 import { rotateAroundPoint } from '@/helpers/rotateAroundPoint'
 import { remap } from '@/helpers/Remap'
-//import { playSFX } from '@/helpers/AudioManager'
+import { useSFX, useMusic } from '@/helpers/AudioManager'
 
 const SceneContent = () =>  {
-  const PLAYER_HEIGHT = 1.5
-  const BOBO_MASS = 4;
-  const GLOVE_MASS = 50;
   const WORLD_UP_VECTOR = new Vector3(0, 1, 0);
-
+  const PLAYER_HEIGHT = 1.5
+  const CAM_ORIGIN = [0, PLAYER_HEIGHT, 1.5]
+  const BOBO_MASS = 4;
+  const BOBO_ORIGIN = [0, 0.001, -2]
+  const GLOVE_MASS = 50;
+  const GLOVE_ORIGINS = {
+    right: [0.5, -0.5, -0.8],
+    left: [-0.5, -0.5, -0.8],
+  }
+  const font = '/font/CircusOrnate.json'
   const boboRef = useRef(null);
   const cameraRef = useRef(null);
   const floorRef = useRef(null);
@@ -24,10 +30,15 @@ const SceneContent = () =>  {
   const boboRB = useRef(null);
   const camRB = useRef(null);
   const { raycaster } = useThree();
-
-  let punching = [false, false]
+  const [round, setRound] = useState(0)
   const [swings, setSwings] = useState(0)
   const [points, setPoints] = useState(0)
+  const [respawn, setRespawn] = useState(false)
+  const [showStats, setShowStats] = useState(false)
+  const sfx = useSFX()
+  const music = useMusic()
+  let punching = [false, false]
+
 
 
 
@@ -48,12 +59,15 @@ const SceneContent = () =>  {
       return value
     }
   })
-  const playerGltf = useGLTF('/player.glb', dracoPath)
+  const {scene: boxingGloveScene } = useGLTF('/player.glb', dracoPath)
+  const boxingGlove = boxingGloveScene.children[0]
+
   //confirm load
-  if (!bobo || !levelNodes || !playerGltf) {
+  if (!bobo || !levelNodes || !boxingGlove) {
     console.log('loading failure')
     return null
   }
+
 
   ////////////////////////////
   //materials
@@ -66,11 +80,7 @@ const SceneContent = () =>  {
   ////////////////////////////
   // config
   //////////////////////////
-  const boxingGlove = playerGltf.scene.children[0] //scene didn't contain a mesh?
-  const gloveOrigins = {
-    right: [0.5, -0.5, -0.8],
-    left: [-0.5, -0.5, -0.8],
-  }
+
   //compute bobo bounding box
   useEffect(() => {
     if (bobo) {
@@ -78,14 +88,38 @@ const SceneContent = () =>  {
     }
   }, [bobo])
 
+  //autostart
+  useEffect(() => {
+    music();
+    setRound(1)
+  }, [music])
+
+  useEffect(() => {
+    console.log(`round ${round}`)
+    sfx({id:'bell'});
+    //respawn bobo
+    if (round > 1) {
+      setRespawn(true)
+    }
+  }, [round])
+
+  useEffect(() => {
+    setShowStats(true);
+    const to = setTimeout(() => {
+      setShowStats(false);
+      setRespawn(false);
+      sfx({id:'bell'});
+    }, 5000);
+    return () => clearTimeout(to);
+  }, [respawn])
+
 
   ///////////////////////////////////
   // animation
   /////////////////////////////////
 
   //camera spring
-  const camOrigin = [0, PLAYER_HEIGHT, 1.5]
-  const [camPosition, setCamPosition] = useState(camOrigin);
+  const [camPosition, setCamPosition] = useState(CAM_ORIGIN);
   const [nextCamPosition, setNextCamPosition] = useState(camPosition)
   const [camRotation, setCamRotation] = useState([0, 0, 0])
   const [nextCamRotation, setNextCamRotation] = useState(camRotation)
@@ -121,8 +155,8 @@ const SceneContent = () =>  {
 
   //punch spring
   let target = new Vector3();
-  const [leftTarget, setLeftTarget] = useState(gloveOrigins.left);
-  const [rightTarget, setRightTarget] = useState(gloveOrigins.right);
+  const [leftTarget, setLeftTarget] = useState(GLOVE_ORIGINS.left);
+  const [rightTarget, setRightTarget] = useState(GLOVE_ORIGINS.right);
   const gloveSpringConfig = {
     mass: 1,
     tension: 400,
@@ -132,19 +166,21 @@ const SceneContent = () =>  {
   }
 
   const [springs, springsApi] = useSprings(2,[{
-    from: { position: gloveOrigins.left },
-    to: [{ position: leftTarget }, {position: gloveOrigins.left}],
+    from: { position: GLOVE_ORIGINS.left },
+    to: [{ position: leftTarget }, {position: GLOVE_ORIGINS.left}],
     config: gloveSpringConfig,
     onChange: () => {updateKinematicObjects(); startPunchingState(0)},
     onRest: () => stopPunchingState(0),
   },
   {
-    from: { position: gloveOrigins.right },
-    to: [{ position: rightTarget}, {position: gloveOrigins.right}],
+    from: { position: GLOVE_ORIGINS.right },
+    to: [{ position: rightTarget}, {position: GLOVE_ORIGINS.right}],
     config: gloveSpringConfig,
     onChange: () => {updateKinematicObjects(); startPunchingState(1)},
     onRest: () => stopPunchingState(1),
   }], [target]);
+
+  //punch logic
 
   const shouldPunchRight = (worldPoint) => {
     const camPos = camSpring.position.get()
@@ -163,22 +199,23 @@ const SceneContent = () =>  {
   }
 
   const stopPunchingState = (key) => {
-    
+    console.log("stop punching")
     if (key) {
-      if (rightTarget.some((value, index) => value !== gloveOrigins.right[index])) {
-        setRightTarget(gloveOrigins.right)
+      if (rightTarget.some((value, index) => value !== GLOVE_ORIGINS.right[index])) {
+        setRightTarget(GLOVE_ORIGINS.right)
       }
       else{
         punching[key] = false;
       }
       
     } else {
-      if (leftTarget.some((value, index) => value !== gloveOrigins.left[index])) {
-        setLeftTarget(gloveOrigins.left)
+      if (leftTarget.some((value, index) => value !== GLOVE_ORIGINS.left[index])) {
+        setLeftTarget(GLOVE_ORIGINS.left)
       }
       else{
         punching[key] = false;
       }
+      console.log(`punching ${key ? 'right' : 'left'}: ${punching[key]}`)
     }
   }
 
@@ -200,6 +237,11 @@ const SceneContent = () =>  {
     return null
   }
 
+  const onPunch = () => {
+    sfx({id:'whoosh'})
+    setSwings(swings + 1)
+  }
+
   const handleBoboClick = (event) => {
     event.stopPropagation()
     console.log('bobo clicked')
@@ -208,13 +250,14 @@ const SceneContent = () =>  {
       //console.log(`hit ${target.toArray()}`)
       if (shouldPunchRight(target)) {
         if (!punching[1]) {
+          onPunch()
           setRightTarget(cameraOffset(target))
-          setSwings(swings + 1)
         }
       } else {
         if (!punching[0]) {
+          onPunch()
           setLeftTarget(cameraOffset(target))
-          setSwings(swings + 1)
+
         }
       }
     }
@@ -223,24 +266,37 @@ const SceneContent = () =>  {
   const handleLevelClick = (event, naviagateToPoint) => {
     event.stopPropagation()
     //console.log('level clicked')
-    if (!punching.right && !punching.left) {
-      let nextPos;
+    if (punching.every((value) => value === false)) {
       if (naviagateToPoint) {
         target = getRaycastHit(raycaster, event, cameraRef.current, floorRef)
         if (target) {
-          nextPos = [target.x, PLAYER_HEIGHT, target.z]
-          //console.log(`move to ${nextPos}`)
-          setNextCamPosition(nextPos)
+          navigateToPoint(target)
         }
       }else{
-        //recenter
-        nextPos = [0, PLAYER_HEIGHT, 0]
-        setNextCamPosition(nextPos)
+        recenterCamera()
       }
-      const nextRotation = getNextRotation(nextPos, boboRB.current.translation())
-      //console.log(`next rotation: ${nextRotation}`)
-      setNextCamRotation(nextRotation)
     }
+  }
+
+  const recenterCamera = () => {
+    const nextPos = [0, PLAYER_HEIGHT, 0]
+    setNextCamPosition(nextPos)
+    lookAtBobo(nextPos)
+    sfx({id:'whoosh'})
+  }
+
+  const navigateToPoint = (point) => {
+    const nextPos = [point.x, PLAYER_HEIGHT, point.z]
+    setNextCamPosition(nextPos)
+    lookAtBobo(nextPos)
+    sfx({id:'whoosh'})
+  }
+
+  const lookAtBobo = (nextPos) => {
+    console.log("where's bobo?")
+    const nextRotation = getNextRotation(nextPos, boboRB.current.translation())
+    //console.log(`next rotation: ${nextRotation}`)
+    setNextCamRotation(nextRotation)
   }
 
   const cameraOffset = (vec) => {
@@ -254,9 +310,11 @@ const SceneContent = () =>  {
     return [0, nextRotation, 0]
   }
 
+
   ///////////////////////////
   //physics handlers
   /////////////////////////
+
   const updateKinematicObjects = () => {
     const camPos = camSpring.position.get()
     camRB.current.setNextKinematicTranslation({x: camPos[0], y: camPos[1], z: camPos[2]})
@@ -275,19 +333,13 @@ const SceneContent = () =>  {
     {x: camPos[0], y: camPos[1], z: camPos[2]}, [0, camSpring.rotation.get()[1], 0])
     //console.log(nextPosLeftGlove)
     gloveLeftRB.current.setNextKinematicTranslation(nextPosLeftGlove)
-    
-  }
-
-  const handleCollision = (e) => {
-    //console.log(`${e.other.rigidBodyObject.name} hit ${e.target.rigidBodyObject.name}`)
   }
 
   const handleBoboContactForce = (e) => {
     if (e.rigidBodyObject.name === 'rightHand' || e.rigidBodyObject.name === 'leftHand') { 
       if (punching.some((value) => value === true)) {
-        //console.log(e.totalForce)
         const punchForce = e.totalForceMagnitude
-        console.log(`punch force: ${punchForce}`) // getting ranges 0-22000 but avg is 300-3000
+        //console.log(`punch force: ${punchForce}`) // getting ranges 0-22000 but avg is 300-3000
         if (punchForce > 3000) {
           setPoints(points + 1)
         }else if (punchForce > 2000) {
@@ -299,11 +351,10 @@ const SceneContent = () =>  {
         }else{
           setPoints(points + 0.1)
         }
-        //playSFX('punch', remap(punchForce, 0, 3000, 0, 1))
+        sfx({id:'hit', volume: remap(punchForce, 0, 23000, 0, 1), playbackRate: (Math.random() - 0.75) * 0.6 + 1.0})
       }
     }
   }
-
   useEffect(() => {
     console.log(`swings: ${swings} points: ${points}`)
   }, [swings, points])
@@ -348,6 +399,7 @@ const SceneContent = () =>  {
   let torque = 0;
   let rotationEuler = new Euler(0,0,0,'XYZ');
   useFrame((state, delta) => {
+    if (boboRB && boboRB.current) {
       rotation = boboRB.current.rotation()
       angularVelocity = boboRB.current.angvel();
       if (Math.abs(rotation.x) < 0.025 && Math.abs(rotation.z) < 0.025 || Math.abs(angularVelocity.x) > 1.1 || Math.abs(angularVelocity.z) > 1.1){
@@ -359,7 +411,40 @@ const SceneContent = () =>  {
         torque = axis.clone().multiplyScalar(angle * delta * 500);
         boboRB.current.addTorque({ x: torque.x + angularVelocity.x * -1, y: 0, z: torque.z + angularVelocity.z * -1}, true);
       }
+    }
   })
+
+  //skyzone
+  const handleSkyZoneEnter = (e) => {
+    if (e.rigidBodyObject.name === 'bobo') {
+      console.log('there he goes')
+      recenterCamera()
+    }
+    else{
+      console.log(`${e.rigidBodyObject.name} hit sky zone`)
+    }
+  }
+
+  //kill zone
+  const handleKillZoneEnter = (e) => {
+    if (e.rigidBodyObject.name === 'bobo') {
+      console.log('bobo ko')
+      resetPhysics()
+      setRound(round + 1)
+      console.log('new round')
+    }
+    else{
+      console.log(`${e.rigidBodyObject.name} hit kill zone`)
+    }
+  }
+
+  const resetPhysics = () => {
+    //console.log('reset physics')
+    setNextCamPosition(CAM_ORIGIN)
+    setNextCamRotation([0, 0, 0])
+    setRightTarget(GLOVE_ORIGINS.right)
+    setLeftTarget(GLOVE_ORIGINS.left)
+  }
 
   return (
     <group>
@@ -383,7 +468,8 @@ const SceneContent = () =>  {
           </animated.group>
         </PerspectiveCamera>
       </animated.group>
-      <Physics debug={false}>
+      {!respawn &&
+      <Physics debug={true}>
         {/* Kinematic Rigidbodies */}
         <RigidBody name='leftHand' type='kinematicPosition' ref={gloveLeftRB} ccd={true} mass={GLOVE_MASS}>
           <BallCollider args={[0.25]} />
@@ -396,17 +482,17 @@ const SceneContent = () =>  {
         </RigidBody>
 
         {/*Bobo*/}
+
         <RigidBody
           name='bobo'
           type='dynamic'
           colliders={false}
-          position={[0, 0.001, -2]}
+          position={BOBO_ORIGIN}
           restitution={0.6}
           friction={0.1}
           linearDamping={0.5}
           angularDamping={0.6}
           ccd={true}
-          onCollisionEnter={handleCollision}
           onContactForce={handleBoboContactForce}
           ref={boboRB}
         >
@@ -427,7 +513,15 @@ const SceneContent = () =>  {
             </MeshCollider>
           ))}
         </RigidBody>
-      </Physics>
+        {/* sky zone */}
+        <RigidBody name='skyZone' type='fixed' colliders={false} position={[0, 6, 0]} onIntersectionEnter={handleSkyZoneEnter} onIntersectionExit={handleSkyZoneEnter} sensor={true}>
+          <CuboidCollider args={[100, 4, 100]} />
+        </RigidBody>
+        {/* kill zone */}
+        <RigidBody name='killZone' type='fixed' colliders={false} position={[0, -10, 0]} onIntersectionEnter={handleKillZoneEnter} sensor={true}>
+          <CuboidCollider args={[100, 4, 100]} />
+        </RigidBody>
+      </Physics>}
 
       {/*Level Geometry*/}
       {levelMeshes.map((obj) => {
@@ -442,6 +536,10 @@ const SceneContent = () =>  {
           />
         )
       })}
+
+      {/* UI */}
+      {/*<StatsUI round={round} score={points} swings={swings}/>*/}
+      {respawn && <Text3D font={font} size={0.5} position={[-1,1,0]} material={gloveMaterial}>KO</Text3D>}
     </group>
   )
 }

@@ -33,6 +33,7 @@ const SceneContent = () =>  {
   const boboRef = useRef(null);
   const cameraRef = useRef(null);
   const floorRef = useRef(null);
+  const gloveInstanceRef = useRef(null);
   const gloveLeftRB = useRef(null);
   const gloveRightRB = useRef(null);
   const boboRB = useRef(null);
@@ -417,18 +418,20 @@ const SceneContent = () =>  {
         <PerspectiveCamera makeDefault fov={90} ref={cameraRef}>
           <animated.group position={idleHands.position} rotation={idleHands.rotation}>
             {/*Left Glove*/}
-            <animated.mesh
+            <animated.instancedMesh
               args={[boxingGlove.geometry, gloveMaterial, 2]}
               rotation={[Math.PI * -0.5, Math.PI * 0.8, Math.PI * 0.2]}
               position={springs[0].position}
-            ></animated.mesh>
+              ref = {gloveInstanceRef}
+            ></animated.instancedMesh>
             {/*Right Glove*/}
-            <animated.mesh
+            <animated.instancedMesh
               args={[boxingGlove.geometry, gloveMaterial, 2]}
               rotation={[Math.PI * -0.25, Math.PI * 1.1, Math.PI * -0.2]}
               position={springs[1].position}
               scale={[-1, 1, 1]}
-            ></animated.mesh>
+              ref = {gloveInstanceRef}
+            ></animated.instancedMesh>
           </animated.group>
         </PerspectiveCamera>
       </animated.group>

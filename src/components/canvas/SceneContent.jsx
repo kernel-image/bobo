@@ -4,16 +4,19 @@ import { useSpring, useSprings, animated, config } from '@react-spring/three'
 import { PerspectiveCamera, Text3D } from '@react-three/drei'
 import { useEffect, useRef, useState} from 'react'
 import { Vector3, Euler } from 'three'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useFrame } from '@react-three/fiber'
 import { Physics, RigidBody, MeshCollider, BallCollider, CuboidCollider } from '@react-three/rapier'
 import { rotateAroundPoint } from '@/helpers/rotateAroundPoint'
 import { remap } from '@/helpers/Remap'
 import { useSFX, useMusic } from '@/helpers/AudioManager'
-import {useModels} from '@/helpers/gltfLoadingMan'
+import { useModels } from '@/helpers/gltfLoadingMan'
 import { levelMaterial, gloveMaterial, testMaterial } from '@/helpers/materials'
 import { useRaycaster } from '@/helpers/useRaycaster'
+import { getBoundingBoxSize } from '@/helpers/getBoundingBoxSize'
+import { getAngularInertia } from '@/helpers/getInertia'
 
 const SceneContent = () =>  {
+  //constants
   const WORLD_UP_VECTOR = new Vector3(0, 1, 0);
   const PLAYER_HEIGHT = 1.5
   const CAM_ORIGIN = [0, PLAYER_HEIGHT, 1.5]
@@ -24,6 +27,7 @@ const SceneContent = () =>  {
     right: [0.5, -0.5, -0.8],
     left: [-0.5, -0.5, -0.8],
   }
+  //refs
   const boboRef = useRef(null);
   const cameraRef = useRef(null);
   const floorRef = useRef(null);
@@ -31,17 +35,16 @@ const SceneContent = () =>  {
   const gloveRightRB = useRef(null);
   const boboRB = useRef(null);
   const camRB = useRef(null);
-  const getRaycastHit = useRaycaster()
+  //states
   const [round, setRound] = useState(0)
   const [swings, setSwings] = useState(0)
   const [points, setPoints] = useState(0)
   const [ko, setKO] = useState(false)
+  let punching = [false, false]
+  //functions
+  const getRaycastHit = useRaycaster()
   const sfx = useSFX()
   const music = useMusic()
-  let punching = [false, false]
-
-
-
 
   ////////////////////////////
   //loaders
@@ -55,11 +58,7 @@ const SceneContent = () =>  {
   //////////////////////////
 
   //compute bobo bounding box
-  useEffect(() => {
-    if (bobo) {
-      bobo.children[0].geometry.computeBoundingBox()
-    }
-  }, [bobo])
+  const { size: boboSize } = getBoundingBoxSize(bobo.children[0]);
 
   //autostart
   useEffect(() => {
@@ -176,15 +175,15 @@ const SceneContent = () =>  {
 
   const punchLeft = (target) => {
     onPunch()
-    setLeftTarget(cameraOffset(target))
+    setLeftTarget(cameraSpace(target))
   }
 
   const punchRight = (target) => {
     onPunch()
-    setRightTarget(cameraOffset(target))
+    setRightTarget(cameraSpace(target))
   }
 
-  const cameraOffset = (vec) => {
+  const cameraSpace = (vec) => {
     return cameraRef.current.worldToLocal(vec).toArray()
   }
 
@@ -309,56 +308,18 @@ const SceneContent = () =>  {
     gloveLeftRB.current.setNextKinematicTranslation(nextPosLeftGlove)
   }
 
-  const handleBoboContactForce = (e) => {
-    if (e.rigidBodyObject.name === 'rightHand' || e.rigidBodyObject.name === 'leftHand') { 
-      if (punching.some((value) => value === true)) {
-        const punchForce = e.totalForceMagnitude
-        //console.log(`punch force: ${punchForce}`) // getting ranges 0-22000 but avg is 300-3000
-        if (punchForce > 3000) {
-          setPoints(points + 1)
-        }else if (punchForce > 2000) {
-          setPoints(points + 0.75)
-        }else if (punchForce > 1000) {
-          setPoints(points + 0.5)
-        }else if (punchForce > 300) {
-          setPoints(points + 0.25)
-        }else{
-          setPoints(points + 0.1)
-        }
-        sfx({id:'hit', volume: remap(punchForce, 0, 23000, 0, 1), playbackRate: (Math.random() - 0.75) * 0.6 + 1.0})
-      }
-    }
-  }
-  useEffect(() => {
-    console.log(`swings: ${swings} points: ${points}`)
-  }, [swings, points])
 
-  const calcCylinderAngularInertia = (radius, height, mass) => {
-    //https://en.wikipedia.org/wiki/List_of_moments_of_inertia
-    const perpendicularAxes = (mass * (3 * radius * radius + height * height)) / 3.0; //assuming center of mass is at the bottom, divide by 12 if center of mass is at the middle
-    const parallelAxes = (mass * radius * radius) / 2.0;
-    return {x: perpendicularAxes, y: parallelAxes, z: perpendicularAxes};
-  }
-
-  const getBoboAngularInertia = (mass) => {
-    let size = new Vector3();
-    boboRef.current.children[0].geometry.boundingBox.getSize(size);
-    const radius = size.x / 2;
-    const height = size.y;
-    return calcCylinderAngularInertia(radius, height, mass)
-  }
 
   //initialize bobo rigidbody mass properties
   useEffect(() => {
     if (boboRB.current) {
-      //boboRB.current.colliderSet.forEach((collider) => collider.density(3))
-      const collider = boboRB.current.colliderSet.getAll()[0]
-      console.log(collider)
+      //const collider = boboRB.current.colliderSet.getAll()[0]
+      //console.log(collider)
       boboRB.current.colliderSet.forEach((collider) =>
         collider.setMassProperties(
           BOBO_MASS, //mass
           boboRB.current.translation(), //centerOfMass
-          getBoboAngularInertia(BOBO_MASS), //principalAngularInertia
+          getAngularInertia(boboSize, BOBO_MASS), //principalAngularInertia
           { w: 1.0, x: 0.0, y: 0.0, z: 0.0 } //angularInertiaLocalFrame
         ),
       )
@@ -389,7 +350,29 @@ const SceneContent = () =>  {
     }
   })
 
-  //skyzone
+  //collision handlers
+
+  const handleBoboContactForce = (e) => {
+    if (e.rigidBodyObject.name === 'rightHand' || e.rigidBodyObject.name === 'leftHand') { 
+      if (punching.some((value) => value === true)) {
+        const punchForce = e.totalForceMagnitude
+        //console.log(`punch force: ${punchForce}`) // getting ranges 0-22000 but avg is 300-3000
+        if (punchForce > 3000) {
+          setPoints(points + 1)
+        }else if (punchForce > 2000) {
+          setPoints(points + 0.75)
+        }else if (punchForce > 1000) {
+          setPoints(points + 0.5)
+        }else if (punchForce > 300) {
+          setPoints(points + 0.25)
+        }else{
+          setPoints(points + 0.1)
+        }
+        sfx({id:'hit', volume: remap(punchForce, 0, 23000, 0, 1), playbackRate: (Math.random() - 0.75) * 0.6 + 1.0})
+      }
+    }
+  }
+
   const handleSkyZoneEnter = (e) => {
     if (e.rigidBodyObject.name === 'bobo') {
       console.log('there he goes')
@@ -400,7 +383,6 @@ const SceneContent = () =>  {
     }
   }
 
-  //kill zone
   const handleKillZoneEnter = (e) => {
     if (e.rigidBodyObject.name === 'bobo') {
       console.log('bobo ko')

@@ -11,6 +11,7 @@ import { remap } from '@/helpers/Remap'
 import { useSFX, useMusic } from '@/helpers/AudioManager'
 import {useModels} from '@/helpers/gltfLoadingMan'
 import { levelMaterial, gloveMaterial, testMaterial } from '@/helpers/materials'
+import { useRaycaster } from '@/helpers/useRaycaster'
 
 const SceneContent = () =>  {
   const WORLD_UP_VECTOR = new Vector3(0, 1, 0);
@@ -30,7 +31,7 @@ const SceneContent = () =>  {
   const gloveRightRB = useRef(null);
   const boboRB = useRef(null);
   const camRB = useRef(null);
-  const { raycaster } = useThree();
+  const getRaycastHit = useRaycaster()
   const [round, setRound] = useState(0)
   const [swings, setSwings] = useState(0)
   const [points, setPoints] = useState(0)
@@ -242,32 +243,18 @@ const SceneContent = () =>  {
   const resetPlayer = () => {
     setNextCamPosition(CAM_ORIGIN)
     setNextCamRotation([0, 0, 0])
-    setRightTarget(GLOVE_ORIGINS.right)
-    setLeftTarget(GLOVE_ORIGINS.left)
   }
 
 
   ////////////////////////////
   //click handlers
   //////////////////////////
-  const getRaycastHit = (raycaster, event, camera, meshObj) => {
-    const screenCoord = event.pointer
-    // Update the raycaster
-    raycaster.setFromCamera(screenCoord, camera)
-    // Check for intersections with the mesh
-    const intersects = raycaster.intersectObject(meshObj)
-    if (intersects.length > 0) {
-      const intersection = intersects[0]
-      const worldPoint = intersection.point
-      return worldPoint
-    }
-    return null
-  }
+
 
   const handleBoboClick = (event) => {
     event.stopPropagation()
     //console.log('bobo clicked')
-    target = getRaycastHit(raycaster, event, cameraRef.current, boboRef.current)
+    target = getRaycastHit(event.pointer, cameraRef.current, boboRef.current)
     if (target) {
       //console.log(`hit ${target.toArray()}`)
       if (shouldPunchRight(target)) {
@@ -287,7 +274,7 @@ const SceneContent = () =>  {
     //console.log('level clicked')
     if (punching.every((value) => value === false)) {
       if (naviagateToPoint) {
-        target = getRaycastHit(raycaster, event, cameraRef.current, floorRef.current)
+        target = getRaycastHit(event.pointer, cameraRef.current, floorRef.current)
         if (target) {
           navigateToPoint(target)
         }

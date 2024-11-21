@@ -28,6 +28,7 @@ const SceneContent = () =>  {
     right: [0.5, -0.5, -0.8],
     left: [-0.5, -0.5, -0.8],
   }
+  const MAX_ROUNDS = 13
   //refs
   const boboRef = useRef(null);
   const cameraRef = useRef(null);
@@ -37,7 +38,7 @@ const SceneContent = () =>  {
   const boboRB = useRef(null);
   const camRB = useRef(null);
   //states
-  const [round, setRound] = useState(0)
+  const [round, setRound] = useState(1)
   const [swings, setSwings] = useState(0)
   const [points, setPoints] = useState(0)
   const [ko, setKO] = useState(false)
@@ -64,18 +65,17 @@ const SceneContent = () =>  {
   //autostart
   useEffect(() => {
     music();
-    setRound(1)
   }, [music])
 
   //round transition
-
   useEffect(() => {
+    if (round > MAX_ROUNDS){
+      console.log('game over')
+      return
+    }
     console.log(`round ${round}`)
     sfx({id:'bell'});
-    //respawn bobo
-    if (round > 1) {
-      setKO(true)
-    }
+    setKO(round > 1)
   }, [round])
 
   useEffect(() => {
@@ -189,7 +189,6 @@ const SceneContent = () =>  {
   }
 
   const stopPunchingState = (key) => {
-    console.log("stop punching")
     if (key) {
       if (rightTarget.some((value, index) => value !== GLOVE_ORIGINS.right[index])) {
         setRightTarget(GLOVE_ORIGINS.right)
@@ -205,11 +204,10 @@ const SceneContent = () =>  {
       else{
         punching[key] = false;
       }
-      console.log(`punching ${key ? 'right' : 'left'}: ${punching[key]}`)
+      //console.log(`punching ${key ? 'right' : 'left'}: ${punching[key]}`)
     }
   }
   
-
   //camera logic
 
   const recenterCamera = () => {

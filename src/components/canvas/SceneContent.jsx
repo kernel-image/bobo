@@ -28,7 +28,7 @@ const SceneContent = () =>  {
     right: [0.5, -0.5, -0.8],
     left: [-0.5, -0.5, -0.8],
   }
-  const MAX_ROUNDS = 13
+  const MAX_ROUNDS = 2
   //refs
   const boboRef = useRef(null);
   const cameraRef = useRef(null);
@@ -37,6 +37,7 @@ const SceneContent = () =>  {
   const gloveRightRB = useRef(null);
   const boboRB = useRef(null);
   const camRB = useRef(null);
+  const score = useRef({});
   //states
   const [round, setRound] = useState(1)
   const [swings, setSwings] = useState(0)
@@ -62,15 +63,33 @@ const SceneContent = () =>  {
   //compute bobo bounding box
   const { size: boboSize } = getBoundingBoxSize(bobo.children[0]);
 
+  ////////////////////////////
+  // game flow logic
+  //////////////////////////
+
   //autostart
   useEffect(() => {
     music();
   }, [music])
 
   //round transition
+  const endRound = () => {
+    score.current[round] = { swings, points } //store round points
+    resetPlayer()
+    setSwings(0)
+    setPoints(0)
+    setRound(round + 1)
+  }
+
   useEffect(() => {
     if (round > MAX_ROUNDS){
       console.log('game over')
+      console.log(score.current)
+      console.log(`final stats:`)
+      console.log(Object.values(score.current).reduce((acc, curr) => ({
+        points: (acc?.points || 0) + curr.points,
+        swings: (acc?.swings || 0) + curr.swings
+      }), {points: 0, swings: 0}))
       return
     }
     console.log(`round ${round}`)
@@ -81,7 +100,7 @@ const SceneContent = () =>  {
   useEffect(() => {
     const to = setTimeout(() => {
       setKO(false);
-      sfx({id:'bell'});
+      if (ko) sfx({id:'bell'});
     }, 5000);
     return () => clearTimeout(to);
   }, [ko])
@@ -302,8 +321,6 @@ const SceneContent = () =>  {
     }
   }
 
-
-
   //initialize bobo rigidbody mass properties
   useEffect(() => {
     if (boboRB.current) {
@@ -386,9 +403,7 @@ const SceneContent = () =>  {
   const handleKillZoneEnter = (e) => {
     if (e.rigidBodyObject.name === 'bobo') {
       console.log('bobo ko')
-      resetPlayer()
-      setRound(round + 1)
-      console.log('new round')
+      endRound()
     }
     else{
       console.log(`${e.rigidBodyObject.name} hit kill zone`)
@@ -431,7 +446,6 @@ const SceneContent = () =>  {
         </RigidBody>
 
         {/*Bobo*/}
-
         <RigidBody
           name='bobo'
           type='dynamic'

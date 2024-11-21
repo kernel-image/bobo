@@ -14,6 +14,7 @@ import { levelMaterial, gloveMaterial, testMaterial } from '@/helpers/materials'
 import { useRaycaster } from '@/helpers/useRaycaster'
 import { getBoundingBoxSize } from '@/helpers/getBoundingBoxSize'
 import { getAngularInertia } from '@/helpers/getInertia'
+import { getLookatRotation } from '@/helpers/getLookatRotation'
 
 const SceneContent = () =>  {
   //constants
@@ -226,17 +227,9 @@ const SceneContent = () =>  {
   }
 
   const lookAtBobo = (nextPos) => {
-    console.log("where's bobo?")
     const nextRotation = getLookatRotation(nextPos, boboRB.current.translation())
     //console.log(`next rotation: ${nextRotation}`)
     setNextCamRotation(nextRotation)
-  }
-
-  const getLookatRotation = (lookFromPos, lookTargetVector) => {
-    const lookFromVector = new Vector3(lookFromPos[0], lookFromPos[1], lookFromPos[2])
-    const targetDirection = new Vector3().subVectors(lookTargetVector, lookFromVector).normalize();
-    const nextRotation = Math.atan2(-targetDirection.x, -targetDirection.z);
-    return [0, nextRotation, 0]
   }
 
   const resetPlayer = () => {

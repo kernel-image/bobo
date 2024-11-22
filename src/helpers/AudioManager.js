@@ -3,8 +3,8 @@ import { spritemap } from './bobo_sfx';
 
 
 
-const useSFX = () => {
-    const [play] = useSound('/audio/bobo_sfx.mp3', {
+const useSFX = (SERVER_PATH) => {
+    const [play] = useSound(`${SERVER_PATH}/audio/bobo_sfx.mp3`, {
         sprite: spritemap,
         loop: false,
     });
@@ -12,8 +12,8 @@ const useSFX = () => {
     return play;
 }
 
-const useMusic = () => {
-    const [play] = useSound('/audio/organ_grinder_01.mp3', {
+const useMusic = (SERVER_PATH) => {
+    const [play] = useSound(`${SERVER_PATH}/audio/organ_grinder_01.mp3`, {
         loop: true,
         playbackRate: 0.8
     });

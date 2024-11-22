@@ -19,6 +19,7 @@ import { StatusUI, FinalStatusUI } from '@/helpers/components/StatusUI'
 
 const SceneContent = () =>  {
   //constants
+  const SERVER_PATH = process.env.NODE_ENV ==="development" ? '' : 'http://www.kernel-image.net/bobo'
   const MAX_ROUNDS = 5
   const ROUND_TIME = 60
   const PLAYER_HEIGHT = 1.5
@@ -46,8 +47,8 @@ const SceneContent = () =>  {
   let punching = [false, false]
   //functions
   const getRaycastHit = useRaycaster()
-  const sfx = useSFX()
-  const music = useMusic()
+  const sfx = useSFX(SERVER_PATH)
+  const music = useMusic(SERVER_PATH)
   const setBoboObjWrapper = (obj) => {
     setBoboObj(obj)
   }
@@ -68,7 +69,7 @@ const SceneContent = () =>  {
   //loaders
   //////////////////////////
 
-  const models = useModels()
+  const models = useModels(SERVER_PATH)
   const {bobo, levelMeshes, levelColliders, boxingGlove} = models
 
   ////////////////////////////
@@ -387,7 +388,7 @@ const SceneContent = () =>  {
   return (
     <group>
       {/* 3D UI */}
-      {ko && <Text3D font={'/font/CircusOrnate.json'} size={ko==='KO' ? 0.5 : 0.25} position={[-1,1,0]} material={gloveMaterial}>{ko}</Text3D>}
+      {ko && <Text3D font={`${SERVER_PATH}/font/CircusOrnate.json`} size={ko==='KO' ? 0.5 : 0.25} position={[-1,1,0]} material={gloveMaterial}>{ko}</Text3D>}
 
       {/* Camera */}
       <animated.group position={camSpring.position} rotation={camSpring.rotation}>

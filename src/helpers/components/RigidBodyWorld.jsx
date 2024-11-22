@@ -33,15 +33,11 @@ const RigidBodyWorld = ({ meshes, handlers, states, setters}) => {
   useEffect(() => {
     if (boboRB.current) {
       const collider = boboRB.current.colliderSet.getAll()[0]
-      console.log('collider')
-      console.log(collider)
-      boboRB.current.colliderSet.forEach((collider) =>
-        collider.setMassProperties(
-          BOBO_MASS, //mass
-          boboRB.current.translation(), //centerOfMass
-          getAngularInertia(boboSize, BOBO_MASS), //principalAngularInertia
-          { w: 1.0, x: 0.0, y: 0.0, z: 0.0 }, //angularInertiaLocalFrame
-        ),
+      collider.setMassProperties(
+        BOBO_MASS, //mass
+        boboRB.current.translation(), //centerOfMass
+        getAngularInertia(boboSize, BOBO_MASS), //principalAngularInertia
+        { w: 1.0, x: 0.0, y: 0.0, z: 0.0 }, //angularInertiaLocalFrame
       )
     }
   }, [boboRB])

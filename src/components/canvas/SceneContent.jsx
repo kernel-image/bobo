@@ -2,7 +2,7 @@
 
 import { useSpring, useSprings, animated, config } from '@react-spring/three'
 import { PerspectiveCamera, Text3D } from '@react-three/drei'
-import { useEffect, useRef, useState} from 'react'
+import { use, useCallback, useEffect, useRef, useState} from 'react'
 import { Vector3 } from 'three'
 import { Physics } from '@react-three/rapier'
 import { useSFX, useMusic } from '@/helpers/AudioManager'
@@ -14,10 +14,12 @@ import { remap } from '@/helpers/Remap'
 import { RigidBodyWorld } from '@/helpers/components/RigidBodyWorld'
 import { rotateAroundPoint } from '@/helpers/rotateAroundPoint'
 import { nullPointerErrorHandler } from '@/helpers/nullPointerErrorHandler'
+import { StatusUI } from '@/helpers/components/StatusUI'
 
 const SceneContent = () =>  {
   //constants
   const MAX_ROUNDS = 2
+  const ROUND_TIME = 60
   const PLAYER_HEIGHT = 1.5
   const CAM_ORIGIN = [0, PLAYER_HEIGHT, 1.5]
   const GLOVE_ORIGINS = {
@@ -30,6 +32,7 @@ const SceneContent = () =>  {
   const gloveInstanceRef = useRef(null);
   const score = useRef({});
   //states
+  const [clockTime, setClockTime] = useState(ROUND_TIME)
   const [boboObj, setBoboObj] = useState(null)
   const [boboRB, setBoboRigidBody] = useState(null)
   const [gloveLeftRB, setLeftRB] = useState(null)
@@ -71,6 +74,19 @@ const SceneContent = () =>  {
   // game flow logic
   //////////////////////////
 
+  useEffect(() => {
+    if (clockTime === 0) {
+      endRound()
+    }
+  }, [clockTime])
+
+  useEffect(() => {
+    const clock = setInterval(() => {
+      setClockTime(clockTime - 1)
+    }, 1000)
+    return () => clearInterval(clock)
+  }, [clockTime])
+
   //autostart
   useEffect(() => {
     music();
@@ -82,6 +98,7 @@ const SceneContent = () =>  {
     resetPlayer()
     setSwings(0)
     setPoints(0)
+    setClockTime(ROUND_TIME)
     setRound(round + 1)
   }
 
@@ -260,7 +277,7 @@ const SceneContent = () =>  {
 
 
   ////////////////////////////
-  // handlers
+  // event handlers
   //////////////////////////
 
   const updateKinematicObjects = () => {
@@ -269,8 +286,7 @@ const SceneContent = () =>  {
       try {
         //update camera
         const camPos = camSpring.position.get()
-        if (camRB)
-          camRB.setNextKinematicTranslation({ x: camPos[0], y: camPos[1], z: camPos[2] })
+        camRB.setNextKinematicTranslation({ x: camPos[0], y: camPos[1], z: camPos[2] })
         //update right glove
         const rightGlovePos = gloveSprings[1].position.get()
         const nextPosRightGlove = rotateAroundPoint(
@@ -291,7 +307,6 @@ const SceneContent = () =>  {
         nullPointerErrorHandler(e)
       }
     }
-    
   }
 
   //click handlers
@@ -372,9 +387,14 @@ const SceneContent = () =>  {
 
   return (
     <group>
+      
+      {ko && <Text3D font={'/font/CircusOrnate.json'} size={0.5} position={[-1,1,0]} material={gloveMaterial}>KO</Text3D>}
+
       {/* Camera */}
       <animated.group position={camSpring.position} rotation={camSpring.rotation}>
         <PerspectiveCamera makeDefault fov={90} ref={cameraRef}>
+          {/* UI */}
+          {<StatusUI round={round} points={points} swings={swings} time={clockTime}/>}
           <animated.group position={idleHands.position} rotation={idleHands.rotation}>
             {/*Left Glove*/}
             <animated.instancedMesh
@@ -417,10 +437,6 @@ const SceneContent = () =>  {
           />
         )
       })}
-
-      {/* UI */}
-      {/*<StatsUI round={round} score={points} swings={swings}/>*/}
-      {ko && <Text3D font={'/font/CircusOrnate.json'} size={0.5} position={[-1,1,0]} material={gloveMaterial}>KO</Text3D>}
     </group>
   )
 }

@@ -3,43 +3,38 @@
 import { useSpring, useSprings, animated, config } from '@react-spring/three'
 import { PerspectiveCamera, Text3D } from '@react-three/drei'
 import { useEffect, useRef, useState} from 'react'
-import { Vector3, Euler } from 'three'
-import { useFrame } from '@react-three/fiber'
-import { Physics, RigidBody, MeshCollider, BallCollider, CuboidCollider } from '@react-three/rapier'
-import { rotateAroundPoint } from '@/helpers/rotateAroundPoint'
-import { remap } from '@/helpers/Remap'
+import { Vector3 } from 'three'
+import { Physics } from '@react-three/rapier'
 import { useSFX, useMusic } from '@/helpers/AudioManager'
 import { useModels } from '@/helpers/gltfLoadingMan'
-import { levelMaterial, gloveMaterial, testMaterial } from '@/helpers/materials'
+import { levelMaterial, gloveMaterial } from '@/helpers/materials'
 import { useRaycaster } from '@/helpers/useRaycaster'
-import { getBoundingBoxSize } from '@/helpers/getBoundingBoxSize'
-import { getAngularInertia } from '@/helpers/getInertia'
 import { getLookatRotation } from '@/helpers/getLookatRotation'
+import { remap } from '@/helpers/Remap'
+import { RigidBodyWorld } from '@/helpers/components/RigidBodyWorld'
+import { rotateAroundPoint } from '@/helpers/rotateAroundPoint'
+import { nullPointerErrorHandler } from '@/helpers/nullPointerErrorHandler'
 
 const SceneContent = () =>  {
   //constants
-  const WORLD_UP_VECTOR = new Vector3(0, 1, 0);
+  const MAX_ROUNDS = 2
   const PLAYER_HEIGHT = 1.5
   const CAM_ORIGIN = [0, PLAYER_HEIGHT, 1.5]
-  const BOBO_MASS = 4;
-  const BOBO_ORIGIN = [0, 0.001, -2]
-  const GLOVE_MASS = 50;
   const GLOVE_ORIGINS = {
     right: [0.5, -0.5, -0.8],
     left: [-0.5, -0.5, -0.8],
   }
-  const MAX_ROUNDS = 2
   //refs
-  const boboRef = useRef(null);
   const cameraRef = useRef(null);
   const floorRef = useRef(null);
   const gloveInstanceRef = useRef(null);
-  const gloveLeftRB = useRef(null);
-  const gloveRightRB = useRef(null);
-  const boboRB = useRef(null);
-  const camRB = useRef(null);
   const score = useRef({});
   //states
+  const [boboObj, setBoboObj] = useState(null)
+  const [boboRB, setBoboRigidBody] = useState(null)
+  const [gloveLeftRB, setLeftRB] = useState(null)
+  const [gloveRightRB, setRightRB] = useState(null)
+  const [camRB, setCamRigidBody] = useState(null)
   const [round, setRound] = useState(1)
   const [swings, setSwings] = useState(0)
   const [points, setPoints] = useState(0)
@@ -49,6 +44,21 @@ const SceneContent = () =>  {
   const getRaycastHit = useRaycaster()
   const sfx = useSFX()
   const music = useMusic()
+  const setBoboObjWrapper = (obj) => {
+    setBoboObj(obj)
+  }
+  const setLRB = (rb) => {
+    setLeftRB(rb)
+  }
+  const setRRB = (rb) => {
+    setRightRB(rb)
+  }
+  const setCamRB = (rb) => {
+    setCamRigidBody(rb)
+  }
+  const setBoboRB = (rb) => {
+    setBoboRigidBody(rb)
+  }
 
   ////////////////////////////
   //loaders
@@ -56,13 +66,6 @@ const SceneContent = () =>  {
 
   const models = useModels()
   const {bobo, levelMeshes, levelColliders, boxingGlove} = models
-
-  ////////////////////////////
-  // config
-  //////////////////////////
-
-  //compute bobo bounding box
-  const { size: boboSize } = getBoundingBoxSize(bobo.children[0]);
 
   ////////////////////////////
   // game flow logic
@@ -132,7 +135,7 @@ const SceneContent = () =>  {
   }), [camPosition, nextCamPosition, camRotation, nextCamRotation])
 
   //idle hands spring
-  const [idleHands, idleHandsApi] = useSpring(() => ({
+  const [idleHands] = useSpring(() => ({
     from: { position: [0, 0, 0], rotation: [0, Math.PI / 80, Math.PI / 100]},
     to: { position: [0, -0.1, 0], rotation: [0, Math.PI / -80, Math.PI / -100]},
     loop: {reverse: true},
@@ -156,7 +159,7 @@ const SceneContent = () =>  {
     precision: 0.2
   }
 
-  const [springs, springsApi] = useSprings(2,[{
+  const [gloveSprings] = useSprings(2,[{
     from: { position: GLOVE_ORIGINS.left },
     to: [{ position: leftTarget }, {position: GLOVE_ORIGINS.left}],
     config: gloveSpringConfig,
@@ -176,7 +179,7 @@ const SceneContent = () =>  {
   const shouldPunchRight = (worldPoint) => {
     const camPos = camSpring.position.get()
     const camVec = new Vector3(camPos[0], camPos[1], camPos[2])
-    const boboToCamera = camVec.clone().sub(boboRef.current.position)
+    const boboToCamera = camVec.clone().sub(boboObj.getWorldPosition(new Vector3()))
     const up = new Vector3(0, 1, 0)
     const right = up.clone().cross(boboToCamera)
     const cameraToPoint = new Vector3(worldPoint.x, worldPoint.y, worldPoint.z).sub(camVec)
@@ -257,14 +260,46 @@ const SceneContent = () =>  {
 
 
   ////////////////////////////
-  //click handlers
+  // handlers
   //////////////////////////
 
+  const updateKinematicObjects = () => {
+    //todo: optimize so only necessary objects are updated
+    if (camRB && gloveRightRB && gloveLeftRB){
+      try {
+        //update camera
+        const camPos = camSpring.position.get()
+        if (camRB)
+          camRB.setNextKinematicTranslation({ x: camPos[0], y: camPos[1], z: camPos[2] })
+        //update right glove
+        const rightGlovePos = gloveSprings[1].position.get()
+        const nextPosRightGlove = rotateAroundPoint(
+          { x: rightGlovePos[0] + camPos[0], y: rightGlovePos[1] + camPos[1], z: rightGlovePos[2] + camPos[2] },
+          { x: camPos[0], y: camPos[1], z: camPos[2] },
+          [0, camSpring.rotation.get()[1], 0],
+        )
+        gloveRightRB.setNextKinematicTranslation(nextPosRightGlove)
+        //update left glove
+        const leftGlovePos = gloveSprings[0].position.get()
+        const nextPosLeftGlove = rotateAroundPoint(
+          { x: leftGlovePos[0] + camPos[0], y: leftGlovePos[1] + camPos[1], z: leftGlovePos[2] + camPos[2] },
+          { x: camPos[0], y: camPos[1], z: camPos[2] },
+          [0, camSpring.rotation.get()[1], 0],
+        )
+        gloveLeftRB.setNextKinematicTranslation(nextPosLeftGlove)
+      } catch (e) {
+        nullPointerErrorHandler(e)
+      }
+    }
+    
+  }
+
+  //click handlers
 
   const handleBoboClick = (event) => {
     event.stopPropagation()
     //console.log('bobo clicked')
-    const target = getRaycastHit(event.pointer, cameraRef.current, boboRef.current)
+    const target = getRaycastHit(event.pointer, cameraRef.current, boboObj)
     if (target) {
       //console.log(`hit ${target.toArray()}`)
       if (shouldPunchRight(target)) {
@@ -294,99 +329,25 @@ const SceneContent = () =>  {
     }
   }
 
-
-  ///////////////////////////
-  //physics handlers
-  /////////////////////////
-
-  const updateKinematicObjects = () => {
-    //todo: optimize so only necessary objects are updated
-    try{
-      //update camera
-      const camPos = camSpring.position.get()
-      camRB.current.setNextKinematicTranslation({x: camPos[0], y: camPos[1], z: camPos[2]})
-      //update right glove
-      const rightGlovePos = springs[1].position.get()
-      const nextPosRightGlove = rotateAroundPoint({x: rightGlovePos[0] + camPos[0], y:  rightGlovePos[1] + camPos[1], z: rightGlovePos[2] + camPos[2]},
-      {x: camPos[0], y: camPos[1], z: camPos[2]}, [0, camSpring.rotation.get()[1], 0])
-      gloveRightRB.current.setNextKinematicTranslation(nextPosRightGlove)
-      //update left glove
-      const leftGlovePos = springs[0].position.get()
-      const nextPosLeftGlove = rotateAroundPoint({x: leftGlovePos[0]+ camPos[0], y: leftGlovePos[1] + camPos[1], z: leftGlovePos[2] + camPos[2]},
-      {x: camPos[0], y: camPos[1], z: camPos[2]}, [0, camSpring.rotation.get()[1], 0])
-      gloveLeftRB.current.setNextKinematicTranslation(nextPosLeftGlove)
-    }catch(e){
-      const expectedMsg = 'null pointer passed to rust'
-      if (e.message === expectedMsg) return
-      else console.log(e)
-    }
-  }
-
-  //initialize bobo rigidbody mass properties
-  useEffect(() => {
-    if (boboRB.current) {
-      //const collider = boboRB.current.colliderSet.getAll()[0]
-      //console.log(collider)
-      boboRB.current.colliderSet.forEach((collider) =>
-        collider.setMassProperties(
-          BOBO_MASS, //mass
-          boboRB.current.translation(), //centerOfMass
-          getAngularInertia(boboSize, BOBO_MASS), //principalAngularInertia
-          { w: 1.0, x: 0.0, y: 0.0, z: 0.0 } //angularInertiaLocalFrame
-        ),
-      )
-    }
-  }, [boboRB])
-
-  //bobo self balancing forces
-  let angularVelocity = { x: 0, y: 0, z: 0 }
-  let rotation = { x: 0, y: 0, z: 0 };
-  let axis = new Vector3();
-  let objUpWorld = new Vector3();
-  let angle = 0;
-  let torque = 0;
-  let rotationEuler = new Euler(0,0,0,'XYZ');
-  useFrame((state, delta) => {
-    if (boboRB && boboRB.current && !ko) {
-      try{
-        rotation = boboRB.current.rotation()
-        angularVelocity = boboRB.current.angvel();
-        if (Math.abs(rotation.x) < 0.025 && Math.abs(rotation.z) < 0.025 || Math.abs(angularVelocity.x) > 1.1 || Math.abs(angularVelocity.z) > 1.1){
-          boboRB.current.resetTorques();
-        }else{
-          objUpWorld = WORLD_UP_VECTOR.clone().applyEuler(rotationEuler.set(rotation.x, rotation.y, rotation.z));
-          axis.crossVectors( objUpWorld, WORLD_UP_VECTOR );
-          angle = Math.acos(objUpWorld.dot(WORLD_UP_VECTOR));
-          torque = axis.clone().multiplyScalar(angle * delta * 500);
-          boboRB.current.addTorque({ x: torque.x + angularVelocity.x * -1, y: 0, z: torque.z + angularVelocity.z * -1}, true);
-        }
-      }catch(e){
-        const expectedMsg = 'null pointer passed to rust'
-        if (e.message === expectedMsg) return
-        else console.log(e)
-      }
-    }
-  })
-
   //collision handlers
 
   const handleBoboContactForce = (e) => {
-    if (e.rigidBodyObject.name === 'rightHand' || e.rigidBodyObject.name === 'leftHand') { 
+    if (e.rigidBodyObject.name === 'rightHand' || e.rigidBodyObject.name === 'leftHand') {
       if (punching.some((value) => value === true)) {
         const punchForce = e.totalForceMagnitude
         //console.log(`punch force: ${punchForce}`) // getting ranges 0-22000 but avg is 300-3000
         if (punchForce > 3000) {
           setPoints(points + 1)
-        }else if (punchForce > 2000) {
+        } else if (punchForce > 2000) {
           setPoints(points + 0.75)
-        }else if (punchForce > 1000) {
+        } else if (punchForce > 1000) {
           setPoints(points + 0.5)
-        }else if (punchForce > 300) {
+        } else if (punchForce > 300) {
           setPoints(points + 0.25)
-        }else{
+        } else {
           setPoints(points + 0.1)
         }
-        sfx({id:'hit', volume: remap(punchForce, 0, 23000, 0, 1), playbackRate: (Math.random() - 0.75) * 0.6 + 1.0})
+        sfx({ id: 'hit', volume: remap(punchForce, 0, 23000, 0, 1), playbackRate: (Math.random() - 0.75) * 0.6 + 1.0 })
       }
     }
   }
@@ -395,8 +356,7 @@ const SceneContent = () =>  {
     if (e.rigidBodyObject.name === 'bobo') {
       console.log('there he goes')
       recenterCamera()
-    }
-    else{
+    } else {
       console.log(`${e.rigidBodyObject.name} hit sky zone`)
     }
   }
@@ -405,8 +365,7 @@ const SceneContent = () =>  {
     if (e.rigidBodyObject.name === 'bobo') {
       console.log('bobo ko')
       endRound()
-    }
-    else{
+    } else {
       console.log(`${e.rigidBodyObject.name} hit kill zone`)
     }
   }
@@ -421,14 +380,14 @@ const SceneContent = () =>  {
             <animated.instancedMesh
               args={[boxingGlove.geometry, gloveMaterial, 2]}
               rotation={[Math.PI * -0.5, Math.PI * 0.8, Math.PI * 0.2]}
-              position={springs[0].position}
+              position={gloveSprings[0].position}
               ref = {gloveInstanceRef}
             ></animated.instancedMesh>
             {/*Right Glove*/}
             <animated.instancedMesh
               args={[boxingGlove.geometry, gloveMaterial, 2]}
               rotation={[Math.PI * -0.25, Math.PI * 1.1, Math.PI * -0.2]}
-              position={springs[1].position}
+              position={gloveSprings[1].position}
               scale={[-1, 1, 1]}
               ref = {gloveInstanceRef}
             ></animated.instancedMesh>
@@ -437,56 +396,12 @@ const SceneContent = () =>  {
       </animated.group>
       {!ko &&
       <Physics debug={true}>
-        {/* Kinematic Rigidbodies */}
-        <RigidBody name='leftHand' type='kinematicPosition' ref={gloveLeftRB} ccd={true} mass={GLOVE_MASS}>
-          <BallCollider args={[0.25]} />
-        </RigidBody>
-        <RigidBody name='rightHand' type='kinematicPosition' ref={gloveRightRB} ccd={true} mass={GLOVE_MASS}>
-          <BallCollider args={[0.25]} />
-        </RigidBody>
-        <RigidBody name='camRB' type='kinematicPosition' ref={camRB}>
-          <BallCollider args={[1]} />
-        </RigidBody>
-
-        {/*Bobo*/}
-        <RigidBody
-          name='bobo'
-          type='dynamic'
-          colliders={false}
-          position={BOBO_ORIGIN}
-          restitution={0.6}
-          friction={0.1}
-          linearDamping={0.5}
-          angularDamping={0.6}
-          ccd={true}
-          onContactForce={handleBoboContactForce}
-          ref={boboRB}
-        >
-          <MeshCollider
-            name='boboCollider'
-            type='hull'
-            args={{ massProperties: { mass: 10, centerOfMass: { x: 0, y: 0.01, z: -2 } } }}
-          >
-            <primitive ref={boboRef} object={bobo} onClick={handleBoboClick} />
-          </MeshCollider>
-        </RigidBody>
-
-        {/* level colliders */}
-        <RigidBody name='level' type='fixed' colliders={false}>
-          {levelColliders.map((obj) => (
-            <MeshCollider key={obj.name} type='cuboid' restitution={0.1} friction={0.5}>
-              <primitive object={obj} material={testMaterial} />
-            </MeshCollider>
-          ))}
-        </RigidBody>
-        {/* sky zone */}
-        <RigidBody name='skyZone' type='fixed' colliders={false} position={[0, 6, 0]} onIntersectionEnter={handleSkyZoneEnter} onIntersectionExit={handleSkyZoneEnter} sensor={true}>
-          <CuboidCollider args={[100, 4, 100]} />
-        </RigidBody>
-        {/* kill zone */}
-        <RigidBody name='killZone' type='fixed' colliders={false} position={[0, -10, 0]} onIntersectionEnter={handleKillZoneEnter} sensor={true}>
-          <CuboidCollider args={[100, 4, 100]} />
-        </RigidBody>
+        <RigidBodyWorld 
+          meshes = {{ bobo, levelColliders }}
+          handlers = {{ handleSkyZoneEnter, handleKillZoneEnter, handleBoboContactForce, handleBoboClick }}
+          states = {{ ko }}
+          setters = {{ setBoboObjWrapper, setLRB, setRRB, setCamRB, setBoboRB }}
+        />
       </Physics>}
 
       {/*Level Geometry*/}

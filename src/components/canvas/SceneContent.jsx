@@ -2,7 +2,7 @@
 
 import { useSpring, useSprings, animated, config } from '@react-spring/three'
 import { PerspectiveCamera, Text3D } from '@react-three/drei'
-import { use, useCallback, useEffect, useRef, useState} from 'react'
+import { useEffect, useRef, useState} from 'react'
 import { Vector3 } from 'three'
 import { Physics } from '@react-three/rapier'
 import { useSFX, useMusic } from '@/helpers/AudioManager'
@@ -14,11 +14,12 @@ import { remap } from '@/helpers/Remap'
 import { RigidBodyWorld } from '@/helpers/components/RigidBodyWorld'
 import { rotateAroundPoint } from '@/helpers/rotateAroundPoint'
 import { nullPointerErrorHandler } from '@/helpers/nullPointerErrorHandler'
-import { StatusUI } from '@/helpers/components/StatusUI'
+import { StatusUI, FinalStatusUI } from '@/helpers/components/StatusUI'
+
 
 const SceneContent = () =>  {
   //constants
-  const MAX_ROUNDS = 2
+  const MAX_ROUNDS = 5
   const ROUND_TIME = 60
   const PLAYER_HEIGHT = 1.5
   const CAM_ORIGIN = [0, PLAYER_HEIGHT, 1.5]
@@ -41,7 +42,7 @@ const SceneContent = () =>  {
   const [round, setRound] = useState(1)
   const [swings, setSwings] = useState(0)
   const [points, setPoints] = useState(0)
-  const [ko, setKO] = useState(false)
+  const [ko, setKO] = useState(null)
   let punching = [false, false]
   //functions
   const getRaycastHit = useRaycaster()
@@ -94,35 +95,33 @@ const SceneContent = () =>  {
 
   //round transition
   const endRound = () => {
-    score.current[round] = { swings, points } //store round points
+    const gameOver = (round >= MAX_ROUNDS)
+    const koValue = gameOver ? 'STOP' : clockTime > 0 ? 'KO' : 'TIME';
+    const koBonus = clockTime > 0  ? (clockTime / 2) : 0
+    const blows = points + koBonus
+    score.current[round] = { swings, blows } //store round points
+    console.log(score.current)
+    sfx({id:'bell'});
     resetPlayer()
-    setSwings(0)
-    setPoints(0)
-    setClockTime(ROUND_TIME)
-    setRound(round + 1)
+    setPoints(blows)
+    setKO( koValue )
   }
 
   useEffect(() => {
-    if (round > MAX_ROUNDS){
-      console.log('game over')
+    if (ko === 'STOP'){
       console.log(score.current)
-      console.log(`final stats:`)
-      console.log(Object.values(score.current).reduce((acc, curr) => ({
-        points: (acc?.points || 0) + curr.points,
-        swings: (acc?.swings || 0) + curr.swings
-      }), {points: 0, swings: 0}))
       return
-    }
-    console.log(`round ${round}`)
-    sfx({id:'bell'});
-    setKO(round > 1)
-  }, [round])
-
-  useEffect(() => {
+    } 
     const to = setTimeout(() => {
-      setKO(false);
-      if (ko) sfx({id:'bell'});
-    }, 5000);
+      if (ko && ko !== 'STOP') {
+        sfx({ id: 'bell' })
+        setClockTime(ROUND_TIME)
+        setSwings(0)
+        setPoints(0)
+        setRound(round + 1)
+      }
+      setKO(null);
+    }, 4000);
     return () => clearTimeout(to);
   }, [ko])
 
@@ -387,14 +386,14 @@ const SceneContent = () =>  {
 
   return (
     <group>
-      
-      {ko && <Text3D font={'/font/CircusOrnate.json'} size={0.5} position={[-1,1,0]} material={gloveMaterial}>KO</Text3D>}
+      {/* 3D UI */}
+      {ko && <Text3D font={'/font/CircusOrnate.json'} size={ko==='KO' ? 0.5 : 0.25} position={[-1,1,0]} material={gloveMaterial}>{ko}</Text3D>}
 
       {/* Camera */}
       <animated.group position={camSpring.position} rotation={camSpring.rotation}>
         <PerspectiveCamera makeDefault fov={90} ref={cameraRef}>
           {/* UI */}
-          {<StatusUI round={round} points={points} swings={swings} time={clockTime}/>}
+          {ko === 'STOP' ? <FinalStatusUI stats={score.current}/> : <StatusUI round={round} points={points} swings={swings} time={clockTime}/>} 
           <animated.group position={idleHands.position} rotation={idleHands.rotation}>
             {/*Left Glove*/}
             <animated.instancedMesh
@@ -415,7 +414,7 @@ const SceneContent = () =>  {
         </PerspectiveCamera>
       </animated.group>
       {!ko &&
-      <Physics debug={true}>
+      <Physics debug={false}>
         <RigidBodyWorld 
           meshes = {{ bobo, levelColliders }}
           handlers = {{ handleSkyZoneEnter, handleKillZoneEnter, handleBoboContactForce, handleBoboClick }}

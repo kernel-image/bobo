@@ -3,7 +3,7 @@ import { useGLTF } from '@react-three/drei'
 const useModels = (serverPath) => {
     const dracoPath = 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/'
     //bobo clown toy
-    const { scene: bobo } = useGLTF(`${serverPath}/models//bobo.glb`, dracoPath)
+    const { scene: bobo } = useGLTF(`${serverPath}/models/bobo.glb`, dracoPath)
     //level meshes
     const { nodes: levelNodes } = useGLTF(`${serverPath}/models/level.glb`, dracoPath)
     const levelMeshes = Object.values(levelNodes).filter((value) => {

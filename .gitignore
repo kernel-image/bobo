@@ -34,3 +34,6 @@ npm-debug.log*
 
 # .vscode Debugging
 .vscode/*-debug-profile
+
+#assets
+public/**/*

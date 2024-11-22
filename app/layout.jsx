@@ -1,11 +1,11 @@
 import { Layout } from '@/components/dom/Layout'
 import '@/global.css'
 
-const title = 'React Three Next Starter'
+const title = 'Bobo & Strongman'
 const url =  process.env.NODE_ENV ==="development" ? 'http://localhost:3000' : 'https://react-three-next.vercel.app'
-const description = 'The easiest and fastest way to create a 3D website using React Three Fiber and NextJS'
-const author = 'Poimandres'
-const twitter = '@pmndrs'
+const description = 'Beat on this clown toughguy'
+const author = 'kernel-image'
+const site = 'http://www.kernel-image.net'
 
 /**
  * @type {import('next').Viewport}
@@ -20,9 +20,9 @@ export const viewport = {
 export const metadata = {
   title: title,
   description: description,
-  authors: [{ name: author, url: 'https://docs.pmnd.rs' }],
+  authors: [{ name: author, url: site }],
   publisher: author,
-  keywords: 'Software Engineer,Product Manager,Project Manager,Data Scientist,Computer Scientist',
+  keywords: 'Game',
   robots: 'index,follow',
   metadataBase: url,
   openGraph: {
@@ -35,7 +35,7 @@ export const metadata = {
   },
   twitter: {
     card: 'summary',
-    site: twitter,
+    site: site,
   },
   manifest: '/manifest.json',
   formatDetection: { email: true, telephone: true },

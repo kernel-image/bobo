@@ -1,4 +1,8 @@
 import { useGLTF } from '@react-three/drei'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+
+GLTFLoader.prototype.crossOrigin = 'anonymous';
+
 
 const useModels = (serverPath) => {
     const dracoPath = 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/'

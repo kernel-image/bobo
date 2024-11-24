@@ -19,7 +19,7 @@ import { StatusUI, FinalStatusUI } from '@/helpers/components/StatusUI'
 
 const SceneContent = () =>  {
   //constants
-  const SERVER_PATH = process.env.NODE_ENV ==="development" ? '' : 'http://www.kernel-image.net/bobo'
+  const SERVER_PATH = process.env.NODE_ENV ==="development" ? '' : 'https://www.kernel-image.net/bobo'
   const MAX_ROUNDS = 5
   const ROUND_TIME = 60
   const PLAYER_HEIGHT = 1.5

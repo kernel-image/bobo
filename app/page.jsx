@@ -3,8 +3,9 @@
 import dynamic from 'next/dynamic'
 import { Suspense } from 'react'
 
-const Content = dynamic(() => import('@/components/canvas/SceneContent').then((mod) => mod.SceneContent), { ssr: false })
-const Lights = dynamic(() => import('@/components/canvas/View').then((mod) => mod.Lights), { ssr: false })
+const Content = dynamic(() => import('@/components/canvas/ShaderTestScene').then((mod) => mod.SceneContent), {
+  ssr: false,
+})
 const View = dynamic(() => import('@/components/canvas/View').then((mod) => mod.View), {
   ssr: false,
   loading: () => (
@@ -21,12 +22,11 @@ const View = dynamic(() => import('@/components/canvas/View').then((mod) => mod.
   ),
 })
 
-export default function Page() {
+export default function Page () {
   return (
     <View className='relative h-full sm:w-full'>
       <Suspense fallback={null}>
         <Content />
-        <Lights color={'#111111'}/>
       </Suspense>
     </View>
   )

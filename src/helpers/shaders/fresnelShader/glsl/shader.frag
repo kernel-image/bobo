@@ -2,11 +2,14 @@
 precision lowp float;
 #endif
 
+//built-in
+//uniform mat4 viewMatrix;
+//uniform vec3 cameraPosition;
+
+varying vec3 viewNV;
 varying vec3 vColorMain;
 varying vec3 vColorFresnel;
 varying float vPower;
-
-in vec3 viewNV;
 
 void main() {
   vec3 N = normalize(viewNV);

@@ -7,10 +7,9 @@ import { testMaterial } from '@/helpers/materials'
 import { nullPointerErrorHandler } from '@/helpers/nullPointerErrorHandler'
 import { Vector3, Euler } from 'three'
 
-const RigidBodyWorld = ({ meshes, handlers, states, setters}) => {
+const RigidBodyWorld = ({ meshes, handlers, states, setters }) => {
   //parse props
-  const { setBoboObjWrapper, setLRB, setRRB, setCamRB, setBoboRB }= setters
-  if ( !setBoboObjWrapper || !setLRB || !setRRB || !setBoboRB ) return null;
+  const { setBoboObjWrapper, setLRB, setRRB, setCamRB, setBoboRB } = setters
   const { bobo, levelColliders } = meshes
   const { handleSkyZoneEnter, handleKillZoneEnter, handleBoboContactForce, handleBoboClick } = handlers
   const { ko } = states
@@ -19,15 +18,14 @@ const RigidBodyWorld = ({ meshes, handlers, states, setters}) => {
   const BOBO_MASS = 4
   const BOBO_ORIGIN = [0, 0.001, -2]
   const GLOVE_MASS = 50
+  //compute bobo bounding box
+  const { size: boboSize } = getBoundingBoxSize(bobo.children[0])
   //refs
   const boboRB = useRef(null)
 
   useEffect(() => {
     setBoboRB(boboRB)
-  }, [boboRB])
-
-  //compute bobo bounding box
-  const { size: boboSize } = getBoundingBoxSize(bobo.children[0])
+  }, [boboRB, setBoboRB])
 
   //initialize bobo rigidbody mass properties
   useEffect(() => {
@@ -40,7 +38,7 @@ const RigidBodyWorld = ({ meshes, handlers, states, setters}) => {
         { w: 1.0, x: 0.0, y: 0.0, z: 0.0 }, //angularInertiaLocalFrame
       )
     }
-  }, [boboRB])
+  }, [boboRB, boboSize])
 
   //bobo self balancing forces
   let angularVelocity = { x: 0, y: 0, z: 0 }

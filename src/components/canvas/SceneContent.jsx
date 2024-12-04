@@ -2,12 +2,12 @@
 
 import { useSpring, useSprings, animated, config } from '@react-spring/three'
 import { PerspectiveCamera, Text3D } from '@react-three/drei'
-import { useEffect, useRef, useState} from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Vector3 } from 'three'
 import { Physics } from '@react-three/rapier'
 import { useSFX, useMusic } from '@/helpers/AudioManager'
-import { useModels } from '@/helpers/gltfLoadingMan'
-import { levelMaterial, gloveMaterial } from '@/helpers/materials'
+import { useModels, useTent } from '@/helpers/gltfLoadingMan'
+import { levelMaterial, gloveMaterial, floorMaterial, tentMaterial } from '@/helpers/materials'
 import { useRaycaster } from '@/helpers/useRaycaster'
 import { getLookatRotation } from '@/helpers/getLookatRotation'
 import { remap } from '@/helpers/Remap'
@@ -15,24 +15,23 @@ import { RigidBodyWorld } from '@/helpers/components/RigidBodyWorld'
 import { rotateAroundPoint } from '@/helpers/rotateAroundPoint'
 import { nullPointerErrorHandler } from '@/helpers/nullPointerErrorHandler'
 import { StatusUI, FinalStatusUI } from '@/helpers/components/StatusUI'
-
-
-const SceneContent = () =>  {
+import { Lights } from './View'
+const SceneContent = () => {
   //constants
-  const SERVER_PATH = process.env.NODE_ENV ==="development" ? '' : 'https://www.kernel-image.net/bobo'
+  const SERVER_PATH = process.env.NODE_ENV === 'development' ? '' : 'https://www.kernel-image.net/bobo'
   const MAX_ROUNDS = 5
   const ROUND_TIME = 60
   const PLAYER_HEIGHT = 1.5
-  const CAM_ORIGIN = [0, PLAYER_HEIGHT, 1.5]
+  const CAM_ORIGIN = useMemo(() => [0, PLAYER_HEIGHT, 1.5], [PLAYER_HEIGHT])
   const GLOVE_ORIGINS = {
     right: [0.5, -0.5, -0.8],
     left: [-0.5, -0.5, -0.8],
   }
   //refs
-  const cameraRef = useRef(null);
-  const floorRef = useRef(null);
-  const gloveInstanceRef = useRef(null);
-  const score = useRef({});
+  const cameraRef = useRef(null)
+  const floorRef = useRef(null)
+  const gloveInstanceRef = useRef(null)
+  const score = useRef({})
   //states
   const [clockTime, setClockTime] = useState(ROUND_TIME)
   const [boboObj, setBoboObj] = useState(null)
@@ -70,17 +69,12 @@ const SceneContent = () =>  {
   //////////////////////////
 
   const models = useModels(SERVER_PATH)
-  const {bobo, levelMeshes, levelColliders, boxingGlove} = models
+  const { bobo, levelMeshes, levelColliders, boxingGlove } = models
+  const tent = useTent(SERVER_PATH)
 
   ////////////////////////////
   // game flow logic
   //////////////////////////
-
-  useEffect(() => {
-    if (clockTime === 0) {
-      endRound()
-    }
-  }, [clockTime])
 
   useEffect(() => {
     const clock = setInterval(() => {
@@ -91,28 +85,36 @@ const SceneContent = () =>  {
 
   //autostart
   useEffect(() => {
-    music();
+    music()
   }, [music])
 
   //round transition
-  const endRound = () => {
-    const gameOver = (round >= MAX_ROUNDS)
-    const koValue = gameOver ? 'STOP' : clockTime > 0 ? 'KO' : 'TIME';
-    const koBonus = clockTime > 0  ? (clockTime / 2) : 0
+  const endRound = useCallback(() => {
+    const gameOver = round >= MAX_ROUNDS
+    const koValue = gameOver ? 'STOP' : clockTime > 0 ? 'KO' : 'TIME'
+    const koBonus = clockTime > 0 ? clockTime / 2 : 0
     const blows = points + koBonus
     score.current[round] = { swings, blows } //store round points
-    console.log(score.current)
-    sfx({id:'bell'});
+    const resetPlayer = () => {
+      setNextCamPosition(CAM_ORIGIN)
+      setNextCamRotation([0, 0, 0])
+    }
+    sfx({ id: 'bell' })
     resetPlayer()
     setPoints(blows)
-    setKO( koValue )
-  }
+    setKO(koValue)
+  }, [round, clockTime, points, swings, sfx, CAM_ORIGIN])
 
   useEffect(() => {
-    if (ko === 'STOP'){
-      console.log(score.current)
+    if (clockTime === 0) {
+      endRound()
+    }
+  }, [clockTime, endRound])
+
+  useEffect(() => {
+    if (ko === 'STOP') {
       return
-    } 
+    }
     const to = setTimeout(() => {
       if (ko && ko !== 'STOP') {
         sfx({ id: 'bell' })
@@ -121,75 +123,91 @@ const SceneContent = () =>  {
         setPoints(0)
         setRound(round + 1)
       }
-      setKO(null);
-    }, 4000);
-    return () => clearTimeout(to);
-  }, [ko])
-
+      setKO(null)
+    }, 4000)
+    return () => clearTimeout(to)
+  }, [ko, round, ROUND_TIME, setRound, setClockTime, setSwings, setPoints, sfx])
 
   ///////////////////////////////////
   // animation
   /////////////////////////////////
 
   //camera spring
-  const [camPosition, setCamPosition] = useState(CAM_ORIGIN);
+  const [camPosition, setCamPosition] = useState(CAM_ORIGIN)
   const [nextCamPosition, setNextCamPosition] = useState(camPosition)
   const [camRotation, setCamRotation] = useState([0, 0, 0])
   const [nextCamRotation, setNextCamRotation] = useState(camRotation)
-  const [camSpring, camSpringApi] = useSpring(() => ({
-    from: { position: camPosition, rotation: camRotation},
-    to: { position: nextCamPosition, rotation: nextCamRotation},
-    config: config.molasses,
-    onChange: () => updateKinematicObjects(),
-    onRest: () => {
-      const restPos = camSpring.position.get()
-      const currentPos = [restPos[0], PLAYER_HEIGHT, restPos[2]]
-      setCamPosition(currentPos)
-      const restRot = camSpring.rotation.get()
-      setCamRotation(restRot)
-    }
-    
-  }), [camPosition, nextCamPosition, camRotation, nextCamRotation])
+  const [camSpring, camSpringApi] = useSpring(
+    () => ({
+      from: { position: camPosition, rotation: camRotation },
+      to: { position: nextCamPosition, rotation: nextCamRotation },
+      config: config.molasses,
+      onChange: () => updateKinematicObjects(),
+      onRest: () => {
+        const restPos = camSpring.position.get()
+        const currentPos = [restPos[0], PLAYER_HEIGHT, restPos[2]]
+        setCamPosition(currentPos)
+        const restRot = camSpring.rotation.get()
+        setCamRotation(restRot)
+      },
+    }),
+    [camPosition, nextCamPosition, camRotation, nextCamRotation],
+  )
 
   //idle hands spring
-  const [idleHands] = useSpring(() => ({
-    from: { position: [0, 0, 0], rotation: [0, Math.PI / 80, Math.PI / 100]},
-    to: { position: [0, -0.1, 0], rotation: [0, Math.PI / -80, Math.PI / -100]},
-    loop: {reverse: true},
-    config: {
-      mass: 1,
-      tension: 15,
-      friction: 1,
-      precision: 0.0035,
-    },
-  }), [])
+  const [idleHands] = useSpring(
+    () => ({
+      from: { position: [0, 0, 0], rotation: [0, Math.PI / 80, Math.PI / 100] },
+      to: { position: [0, -0.1, 0], rotation: [0, Math.PI / -80, Math.PI / -100] },
+      loop: { reverse: true },
+      config: {
+        mass: 1,
+        tension: 15,
+        friction: 1,
+        precision: 0.0035,
+      },
+    }),
+    [],
+  )
 
   //punch spring
-  const [leftTarget, setLeftTarget] = useState(GLOVE_ORIGINS.left);
-  const [rightTarget, setRightTarget] = useState(GLOVE_ORIGINS.right);
+  const [leftTarget, setLeftTarget] = useState(GLOVE_ORIGINS.left)
+  const [rightTarget, setRightTarget] = useState(GLOVE_ORIGINS.right)
 
   const gloveSpringConfig = {
     mass: 1,
     tension: 400,
     friction: 10,
-    velocity: .01,
-    precision: 0.2
+    velocity: 0.01,
+    precision: 0.2,
   }
 
-  const [gloveSprings] = useSprings(2,[{
-    from: { position: GLOVE_ORIGINS.left },
-    to: [{ position: leftTarget }, {position: GLOVE_ORIGINS.left}],
-    config: gloveSpringConfig,
-    onChange: () => {updateKinematicObjects(); startPunchingState(0)},
-    onRest: () => stopPunchingState(0),
-  },
-  {
-    from: { position: GLOVE_ORIGINS.right },
-    to: [{ position: rightTarget}, {position: GLOVE_ORIGINS.right}],
-    config: gloveSpringConfig,
-    onChange: () => {updateKinematicObjects(); startPunchingState(1)},
-    onRest: () => stopPunchingState(1),
-  }], [leftTarget, rightTarget]);
+  const [gloveSprings] = useSprings(
+    2,
+    [
+      {
+        from: { position: GLOVE_ORIGINS.left },
+        to: [{ position: leftTarget }, { position: GLOVE_ORIGINS.left }],
+        config: gloveSpringConfig,
+        onChange: () => {
+          updateKinematicObjects()
+          startPunchingState(0)
+        },
+        onRest: () => stopPunchingState(0),
+      },
+      {
+        from: { position: GLOVE_ORIGINS.right },
+        to: [{ position: rightTarget }, { position: GLOVE_ORIGINS.right }],
+        config: gloveSpringConfig,
+        onChange: () => {
+          updateKinematicObjects()
+          startPunchingState(1)
+        },
+        onRest: () => stopPunchingState(1),
+      },
+    ],
+    [leftTarget, rightTarget],
+  )
 
   //punch logic
 
@@ -202,15 +220,15 @@ const SceneContent = () =>  {
     const cameraToPoint = new Vector3(worldPoint.x, worldPoint.y, worldPoint.z).sub(camVec)
     const dot = right.dot(cameraToPoint)
     const isRight = dot > 0
-    return isRight;
-  };
+    return isRight
+  }
 
   const startPunchingState = (key) => {
-    punching[key] = true;
+    punching[key] = true
   }
 
   const onPunch = () => {
-    sfx({id:'whoosh'})
+    sfx({ id: 'whoosh' })
     setSwings(swings + 1)
   }
 
@@ -232,36 +250,33 @@ const SceneContent = () =>  {
     if (key) {
       if (rightTarget.some((value, index) => value !== GLOVE_ORIGINS.right[index])) {
         setRightTarget(GLOVE_ORIGINS.right)
+      } else {
+        punching[key] = false
       }
-      else{
-        punching[key] = false;
-      }
-      
     } else {
       if (leftTarget.some((value, index) => value !== GLOVE_ORIGINS.left[index])) {
         setLeftTarget(GLOVE_ORIGINS.left)
-      }
-      else{
-        punching[key] = false;
+      } else {
+        punching[key] = false
       }
       //console.log(`punching ${key ? 'right' : 'left'}: ${punching[key]}`)
     }
   }
-  
+
   //camera logic
 
   const recenterCamera = () => {
     const nextPos = [0, PLAYER_HEIGHT, 0]
     setNextCamPosition(nextPos)
     lookAtBobo(nextPos)
-    sfx({id:'whoosh'})
+    sfx({ id: 'whoosh' })
   }
 
   const navigateToPoint = (point) => {
     const nextPos = [point.x, PLAYER_HEIGHT, point.z]
     setNextCamPosition(nextPos)
     lookAtBobo(nextPos)
-    sfx({id:'whoosh'})
+    sfx({ id: 'whoosh' })
   }
 
   const lookAtBobo = (nextPos) => {
@@ -270,19 +285,13 @@ const SceneContent = () =>  {
     setNextCamRotation(nextRotation)
   }
 
-  const resetPlayer = () => {
-    setNextCamPosition(CAM_ORIGIN)
-    setNextCamRotation([0, 0, 0])
-  }
-
-
   ////////////////////////////
   // event handlers
   //////////////////////////
 
   const updateKinematicObjects = () => {
     //todo: optimize so only necessary objects are updated
-    if (camRB && gloveRightRB && gloveLeftRB){
+    if (camRB && gloveRightRB && gloveLeftRB) {
       try {
         //update camera
         const camPos = camSpring.position.get()
@@ -331,6 +340,7 @@ const SceneContent = () =>  {
 
   const handleLevelClick = (event, naviagateToPoint) => {
     event.stopPropagation()
+    if (ko || clockTime <= 0) return
     //console.log('level clicked')
     if (punching.every((value) => value === false)) {
       if (naviagateToPoint) {
@@ -338,7 +348,7 @@ const SceneContent = () =>  {
         if (target) {
           navigateToPoint(target)
         }
-      }else{
+      } else {
         recenterCamera()
       }
     }
@@ -369,39 +379,48 @@ const SceneContent = () =>  {
 
   const handleSkyZoneEnter = (e) => {
     if (e.rigidBodyObject.name === 'bobo') {
-      console.log('there he goes')
+      //console.log('there he goes')
       recenterCamera()
-    } else {
-      console.log(`${e.rigidBodyObject.name} hit sky zone`)
     }
   }
 
   const handleKillZoneEnter = (e) => {
     if (e.rigidBodyObject.name === 'bobo') {
-      console.log('bobo ko')
       endRound()
-    } else {
-      console.log(`${e.rigidBodyObject.name} hit kill zone`)
     }
   }
 
   return (
     <group>
       {/* 3D UI */}
-      {ko && <Text3D font={`${SERVER_PATH}/font/CircusOrnate.json`} size={ko==='KO' ? 0.5 : 0.25} position={[-1,1,0]} material={gloveMaterial}>{ko}</Text3D>}
-
+      {ko && (
+        <Text3D
+          font={`${SERVER_PATH}/font/CircusOrnate.json`}
+          size={ko === 'KO' ? 0.5 : 0.25}
+          position={[-1, 1, 0]}
+          material={gloveMaterial}
+        >
+          {ko}
+        </Text3D>
+      )}
+      {/* Lights */}
+      <Lights />
       {/* Camera */}
       <animated.group position={camSpring.position} rotation={camSpring.rotation}>
-        <PerspectiveCamera makeDefault fov={90} ref={cameraRef}>
+        <PerspectiveCamera makeDefault fov={90} ref={cameraRef} near={0.1} far={20}>
           {/* UI */}
-          {ko === 'STOP' ? <FinalStatusUI stats={score.current}/> : <StatusUI round={round} points={points} swings={swings} time={clockTime}/>} 
+          {ko === 'STOP' ? (
+            <FinalStatusUI stats={score.current} />
+          ) : (
+            <StatusUI round={round} points={points} swings={swings} time={clockTime} />
+          )}
           <animated.group position={idleHands.position} rotation={idleHands.rotation}>
             {/*Left Glove*/}
             <animated.instancedMesh
               args={[boxingGlove.geometry, gloveMaterial, 2]}
               rotation={[Math.PI * -0.5, Math.PI * 0.8, Math.PI * 0.2]}
               position={gloveSprings[0].position}
-              ref = {gloveInstanceRef}
+              ref={gloveInstanceRef}
             ></animated.instancedMesh>
             {/*Right Glove*/}
             <animated.instancedMesh
@@ -409,20 +428,21 @@ const SceneContent = () =>  {
               rotation={[Math.PI * -0.25, Math.PI * 1.1, Math.PI * -0.2]}
               position={gloveSprings[1].position}
               scale={[-1, 1, 1]}
-              ref = {gloveInstanceRef}
+              ref={gloveInstanceRef}
             ></animated.instancedMesh>
           </animated.group>
         </PerspectiveCamera>
       </animated.group>
-      {!ko &&
-      <Physics debug={false}>
-        <RigidBodyWorld 
-          meshes = {{ bobo, levelColliders }}
-          handlers = {{ handleSkyZoneEnter, handleKillZoneEnter, handleBoboContactForce, handleBoboClick }}
-          states = {{ ko }}
-          setters = {{ setBoboObjWrapper, setLRB, setRRB, setCamRB, setBoboRB }}
-        />
-      </Physics>}
+      {!ko && (
+        <Physics debug={false}>
+          <RigidBodyWorld
+            meshes={{ bobo, levelColliders }}
+            handlers={{ handleSkyZoneEnter, handleKillZoneEnter, handleBoboContactForce, handleBoboClick }}
+            states={{ ko }}
+            setters={{ setBoboObjWrapper, setLRB, setRRB, setCamRB, setBoboRB }}
+          />
+        </Physics>
+      )}
 
       {/*Level Geometry*/}
       {levelMeshes.map((obj) => {
@@ -431,12 +451,14 @@ const SceneContent = () =>  {
           <primitive
             key={obj.name}
             object={obj}
-            material={levelMaterial}
+            material={isFloor ? floorMaterial : levelMaterial}
             onClick={(e) => handleLevelClick(e, isFloor)}
             ref={isFloor ? floorRef : null}
+            receiveShadow={isFloor}
           />
         )
       })}
+      <primitive object={tent} position={[0, -3, 0]} scale={(0.5, 0.5, 0.5)} material={tentMaterial} />
     </group>
   )
 }

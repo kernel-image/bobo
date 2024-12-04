@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic'
 import { Suspense } from 'react'
 
-const Content = dynamic(() => import('@/components/canvas/LandingContent').then((mod) => mod.SceneContent), {
+const Content = dynamic(() => import('@/components/canvas/SceneContent').then((mod) => mod.SceneContent), {
   ssr: false,
 })
 const View = dynamic(() => import('@/components/canvas/View').then((mod) => mod.View), {
@@ -24,14 +24,11 @@ const View = dynamic(() => import('@/components/canvas/View').then((mod) => mod.
 
 export default function Page() {
   return (
-    <>
-      <h1 className='text-9xl font-bold'>TEST YOUR DOMINANCE</h1>
-      <h2 className='text-8xl font-bold'>ENTER THE ARENA --&gt;</h2>
-      <View className='relative h-full sm:w-full'>
-        <Suspense fallback={null}>
-          <Content />
-        </Suspense>
-      </View>
-    </>
+    <View className='relative h-full sm:w-full'>
+      <Suspense fallback={null}>
+        <color attach='background' args={[0.01, 0.0, 0.01]} />
+        <Content />
+      </Suspense>
+    </View>
   )
 }

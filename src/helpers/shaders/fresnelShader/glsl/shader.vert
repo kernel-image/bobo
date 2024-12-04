@@ -7,9 +7,9 @@ precision lowp float;
 // = object.matrixWorld
 //uniform mat4 modelMatrix;
 // = camera.matrixWorldInverse * object.matrixWorld
-uniform mat4 modelViewMatrix;
+//uniform mat4 modelViewMatrix;
 // = camera.projectionMatrix
-uniform mat4 projectionMatrix;
+//uniform mat4 projectionMatrix;
 // = camera.matrixWorldInverse
 //uniform mat4 viewMatrix;
 // = inverse transpose of modelViewMatrix
@@ -18,8 +18,8 @@ uniform mat4 projectionMatrix;
 //uniform vec3 cameraPosition;
 //
 // default vertex attributes provided by BufferGeometry
-attribute vec3 position;
-attribute vec3 normal;
+//attribute vec3 position;
+//attribute vec3 normal;
 //attribute vec2 uv;
 
 uniform vec3 colorMain;

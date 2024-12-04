@@ -10,7 +10,7 @@ const CustomFresnel = shaderMaterial(
   {
     colorMain: new THREE.Color(1.0, 1.0, 0.0),
     colorFresnel: new THREE.Color(0.0, 0.0, 0.0),
-    power: 5.0,
+    power: 0.8,
   },
   vertex,
   fragment,
@@ -27,4 +27,4 @@ const MeshFresnelMaterial = forwardRef(({ children, ...props }, ref) => {
   return <customFresnel key={CustomFresnel.key} ref={localRef} glsl={THREE.GLSL3} {...props} attach='material' />
 })
 
-export { MeshFresnelMaterial }
+export { MeshFresnelMaterial, CustomFresnel }

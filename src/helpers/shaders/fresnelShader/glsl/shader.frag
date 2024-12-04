@@ -1,6 +1,4 @@
-#ifdef GL_ES
 precision lowp float;
-#endif
 
 //built-in
 //uniform mat4 viewMatrix;

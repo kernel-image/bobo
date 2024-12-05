@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic'
 import { Suspense } from 'react'
 
-const Content = dynamic(() => import('@/components/canvas/ShaderTestScene').then((mod) => mod.TentInside), {
+const Content = dynamic(() => import('@/components/canvas/ShaderTestScene').then((mod) => mod.Burst), {
   ssr: false,
 })
 const View = dynamic(() => import('@/components/canvas/View').then((mod) => mod.View), {

@@ -2,7 +2,10 @@ import { PerspectiveCamera } from '@react-three/drei'
 import { MeshFresnelMaterial } from '@/helpers/shaders/fresnelShader/fresnelShader'
 import { MeshRaysMaterial } from '@/helpers/shaders/raysShader/raysShader'
 import { MeshStripeMaterial } from '@/helpers/shaders/raysShader/stripeShader'
+import { MeshBurstMaterial } from '@/helpers/shaders/burstShader/burstShader'
 import { OrbitControls } from '@react-three/drei'
+import { useFrame } from '@react-three/fiber'
+import { useRef } from 'react'
 
 const FresnelTest = () => {
   return (
@@ -76,4 +79,23 @@ const TentInside = () => {
   )
 }
 
-export { FresnelTest, TentRays, TentStripes, TentInside }
+const Burst = () => {
+  const color = 'orange'
+  const materialRef = useRef()
+  let progress = 0
+
+  useFrame((state, delta) => {
+    materialRef.current.progress += delta
+  })
+  return (
+    <>
+      <OrbitControls />
+      <mesh position={[0, 0, 0]}>
+        <planeGeometry args={[6, 6]} attach={'geometry'} />
+        <MeshBurstMaterial ref={materialRef} color={color} progress={progress} attach='material' />
+      </mesh>
+    </>
+  )
+}
+
+export { FresnelTest, TentRays, TentStripes, TentInside, Burst }

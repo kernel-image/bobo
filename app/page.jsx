@@ -24,14 +24,14 @@ const View = dynamic(() => import('@/components/canvas/View').then((mod) => mod.
 
 export default function Page() {
   return (
-    <>
-      <h1 className='text-9xl font-bold'>TEST YOUR DOMINANCE</h1>
-      <h2 className='text-8xl font-bold'>ENTER THE ARENA --&gt;</h2>
-      <View className='relative h-full sm:w-full'>
+    <div className='h-full bg-gradient-to-b from-blue-400 via-pink-300 to-orange-200'>
+      <h1 className='text-9xl font-bold'>TEST YOUR TESTOSTERONE</h1>
+      <h2 className='text-8xl font-bold'>ENTER THE RING --&gt;</h2>
+      <View className='absolute top-0 h-full sm:w-full '>
         <Suspense fallback={null}>
           <Content />
         </Suspense>
       </View>
-    </>
+    </div>
   )
 }

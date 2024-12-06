@@ -1,14 +1,15 @@
 precision mediump float;
 
-varying vec3 vColor1;
-varying vec3 vColor2;
+uniform vec3 uColorMain;
+uniform vec3 uColorNoise;
+uniform float uOctaves;
+uniform float uContrast;
+uniform float uScale;
+uniform float uLevel;
+uniform float uGain;
+uniform float uSeed;
+
 varying vec2 vUv;
-varying float vOctaves;
-varying float vContrast;
-varying float vScale;
-varying float vLevel;
-varying float vGain;
-varying float vSeed;
 
 float random1d(float st, float seed){
     return fract(abs(sin(st * (468759.468795+seed)) * 432152.001579));
@@ -16,7 +17,7 @@ float random1d(float st, float seed){
 
 float random2d(vec2 st, float seed) {
     //return fract(sin(dot(st, vec2(13.4127, 78.00186))) * 86845.1349787);
-    return fract(sin(dot(st, vec2(random1d(st.x, seed)*100., vec2(st.y, seed)*100.))));
+    return fract(sin(dot(st, vec2(random1d(st.x, seed)*100., random1d(st.y, seed)*100.))));
 }
 
 // 2D Noise based on Morgan McGuire @morgan3d
@@ -70,13 +71,10 @@ float maskShape(in vec2 st){
 }
 
 void main(){
-    //float val = noise2d(vUv * vScale);
     vec2 st = vUv;
-    float val = fbm (st, vOctaves, vScale, vSeed);
+    float val = fbm (st, uOctaves, uScale, uSeed);
     val *= maskShape(st) * 3.;
-    vec3 color = mix(vColor1, vColor2, val);
-    color = clamp(contrast(color, vContrast) * vGain + vLevel,0.0, 1.0);
-    //color = vec3(random1d(vUv.x * vUv.y, vSeed));
+    vec3 color = mix(uColorMain, uColorNoise, val);
+    color = clamp(contrast(color, uContrast) * uGain + uLevel,0.0, 1.0);
     gl_FragColor = vec4(color, 1.0);
-
 }

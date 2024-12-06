@@ -106,14 +106,14 @@ const Noise = () => {
       <mesh position={[0, 0, 0]}>
         <planeGeometry args={[6, 6]} attach={'geometry'} />
         <MeshNoiseMaterial
-          colorMain={new Color(0.4, 0.4, 0.6)}
-          colorNoise={new Color(0.6, 0.6, 0.75)}
-          contrast={0.8}
-          gain={1.1}
-          level={0.07}
-          scale={3}
-          octaves={4}
-          seed={3}
+          uColorMain={new Color(0.4, 0.4, 0.6)}
+          uColorNoise={new Color(0.6, 0.6, 0.75)}
+          uContrast={0.8}
+          uGain={1.1}
+          uLevel={0.07}
+          uScale={3}
+          uOctaves={4}
+          uSeed={3}
         />
       </mesh>
     </>

@@ -5,17 +5,18 @@ import { shaderMaterial } from '@react-three/drei'
 import vertex from './glsl/shader.vert'
 import fragment from './glsl/shader.frag'
 import { forwardRef, useImperativeHandle, useRef } from 'react'
+import { extendMaterial } from '@/helpers/shaders/ExtendMaterial'
 
 const CustomNoise = shaderMaterial(
   {
-    colorMain: new THREE.Color(1.0, 1.0, 1.0),
-    colorNoise: new THREE.Color(0.0, 0.0, 0.0),
-    octaves: 1.0,
-    contrast: 1.0,
-    gain: 1.0,
-    level: 0.0,
-    scale: 1.0,
-    seed: 0.0,
+    uColorMain: new THREE.Color(1.0, 1.0, 1.0),
+    uColorNoise: new THREE.Color(0.0, 0.0, 0.0),
+    uOctaves: 1.0,
+    uContrast: 1.0,
+    uGain: 1.0,
+    uLevel: 0.0,
+    uScale: 1.0,
+    uSeed: 0.0,
   },
   vertex,
   fragment,

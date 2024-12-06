@@ -16,6 +16,7 @@ import { rotateAroundPoint } from '@/helpers/rotateAroundPoint'
 import { nullPointerErrorHandler } from '@/helpers/nullPointerErrorHandler'
 import { StatusUI, FinalStatusUI } from '@/helpers/components/StatusUI'
 import { Lights } from './View'
+import { BurstSprite } from '@/helpers/components/BurstVFX'
 const SceneContent = () => {
   //constants
   const SERVER_PATH = process.env.NODE_ENV === 'development' ? '' : 'https://www.kernel-image.net/bobo'
@@ -43,6 +44,7 @@ const SceneContent = () => {
   const [swings, setSwings] = useState(0)
   const [points, setPoints] = useState(0)
   const [ko, setKO] = useState(null)
+  const [hitPosition, setHitPosition] = useState(null)
   let punching = [false, false]
   //functions
   const getRaycastHit = useRaycaster()
@@ -68,8 +70,7 @@ const SceneContent = () => {
   //loaders
   //////////////////////////
 
-  const models = useModels(SERVER_PATH)
-  const { bobo, levelMeshes, levelColliders, boxingGlove } = models
+  const { bobo, levelMeshes, levelColliders, boxingGlove } = useModels(SERVER_PATH)
   const tent = useTent(SERVER_PATH)
 
   ////////////////////////////
@@ -251,7 +252,7 @@ const SceneContent = () => {
       if (rightTarget.some((value, index) => value !== GLOVE_ORIGINS.right[index])) {
         setRightTarget(GLOVE_ORIGINS.right)
       } else {
-        punching[key] = false
+        punching[key] = false //TODO: FIX RACE CONDITION WHERE PUNCH IS CONSIDERED COMPLETE BEFORE IT HAS FINISHED
       }
     } else {
       if (leftTarget.some((value, index) => value !== GLOVE_ORIGINS.left[index])) {
@@ -259,7 +260,6 @@ const SceneContent = () => {
       } else {
         punching[key] = false
       }
-      //console.log(`punching ${key ? 'right' : 'left'}: ${punching[key]}`)
     }
   }
 
@@ -373,6 +373,7 @@ const SceneContent = () => {
           setPoints(points + 0.1)
         }
         sfx({ id: 'hit', volume: remap(punchForce, 0, 23000, 0, 1), playbackRate: (Math.random() - 0.75) * 0.6 + 1.0 })
+        setHitPosition({ ...e.rigidBodyObject.position }) // returns vector
       }
     }
   }
@@ -443,6 +444,8 @@ const SceneContent = () => {
           />
         </Physics>
       )}
+      {/* VFX */}
+      {hitPosition && <BurstSprite x={hitPosition.x} y={hitPosition.y} z={hitPosition.z} />}
 
       {/*Level Geometry*/}
       {levelMeshes.map((obj) => {

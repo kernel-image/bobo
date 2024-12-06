@@ -1,11 +1,12 @@
-import { PerspectiveCamera } from '@react-three/drei'
+import { PerspectiveCamera, OrbitControls } from '@react-three/drei'
 import { MeshFresnelMaterial } from '@/helpers/shaders/fresnelShader/fresnelShader'
 import { MeshRaysMaterial } from '@/helpers/shaders/raysShader/raysShader'
 import { MeshStripeMaterial } from '@/helpers/shaders/raysShader/stripeShader'
 import { MeshBurstMaterial } from '@/helpers/shaders/burstShader/burstShader'
-import { OrbitControls } from '@react-three/drei'
+import { MeshNoiseMaterial } from '@/helpers/shaders/noiseShader/noiseShader'
 import { useFrame } from '@react-three/fiber'
 import { useRef } from 'react'
+import { Color } from 'three'
 
 const FresnelTest = () => {
   return (
@@ -98,4 +99,25 @@ const Burst = () => {
   )
 }
 
-export { FresnelTest, TentRays, TentStripes, TentInside, Burst }
+const Noise = () => {
+  return (
+    <>
+      <OrbitControls />
+      <mesh position={[0, 0, 0]}>
+        <planeGeometry args={[6, 6]} attach={'geometry'} />
+        <MeshNoiseMaterial
+          colorMain={new Color(0.4, 0.4, 0.6)}
+          colorNoise={new Color(0.6, 0.6, 0.75)}
+          contrast={0.8}
+          gain={1.1}
+          level={0.07}
+          scale={3}
+          octaves={4}
+          seed={3}
+        />
+      </mesh>
+    </>
+  )
+}
+
+export { FresnelTest, TentRays, TentStripes, TentInside, Burst, Noise }

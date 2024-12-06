@@ -13,6 +13,12 @@ const CustomBurst = shaderMaterial(
   },
   vertex,
   fragment,
+  (material) => {
+    //onInit
+    if (material) {
+      material.transparent = true
+    }
+  },
 )
 
 extend({ CustomBurst })

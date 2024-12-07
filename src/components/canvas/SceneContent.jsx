@@ -24,6 +24,7 @@ const SceneContent = () => {
   const ROUND_TIME = 60
   const PLAYER_HEIGHT = 1.5
   const CAM_ORIGIN = useMemo(() => [0, PLAYER_HEIGHT, 1.5], [PLAYER_HEIGHT])
+  const CAM_BOUNDS = [5, 5]
   const GLOVE_ORIGINS = {
     right: [0.5, -0.5, -0.8],
     left: [-0.5, -0.5, -0.8],
@@ -273,10 +274,26 @@ const SceneContent = () => {
   }
 
   const navigateToPoint = (point) => {
-    const nextPos = [point.x, PLAYER_HEIGHT, point.z]
+    const nextPos = correctNextCamPosition(point)
     setNextCamPosition(nextPos)
     lookAtBobo(nextPos)
     sfx({ id: 'whoosh' })
+  }
+
+  const checkNextCamPosition = (nextPos) => {
+    const _nextPos = [nextPos[0], nextPos[2]]
+    if (_nextPos.every((value, index) => Math.abs(value) < CAM_BOUNDS[index]))
+      return true
+    else{
+      console.log(`out of bounds: ${_nextPos}`)
+      return false
+    }
+  }
+
+  const correctNextCamPosition = (point) => {
+    const _nextPos = [point.x, point.z]
+    const correctedNextPos = checkNextCamPosition(_nextPos) ? _nextPos : _nextPos.map((value, index) => Math.min(Math.max(value, -CAM_BOUNDS[index]), CAM_BOUNDS[index]))
+    return [correctedNextPos[0], PLAYER_HEIGHT, correctedNextPos[1]]
   }
 
   const lookAtBobo = (nextPos) => {

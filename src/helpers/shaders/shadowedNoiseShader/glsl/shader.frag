@@ -1,9 +1,10 @@
+precision mediump float;
+
 #include <common>
 #include <packing>
 #include <lights_pars_begin>
 #include <shadowmap_pars_fragment>
 #include <shadowmask_pars_fragment>
-precision mediump float;
 
 uniform vec3 uColorMain;
 uniform vec3 uColorNoise;
@@ -17,13 +18,9 @@ uniform float uSeed;
 varying vec2 vUv;
 varying vec3 vNormal;
 
-float random1d(float st, float seed) {
-    return fract(abs(sin(st * (468759.468795 + seed)) * 432152.001579));
-}
 
 float random2d(vec2 st, float seed) {
-    //return fract(sin(dot(st, vec2(13.4127, 78.00186))) * 86845.1349787);
-    return fract(sin(dot(st, vec2(random1d(st.x, seed) * 100., random1d(st.y, seed) * 100.))));
+    return fract(sin(dot(st, vec2(1.))* 432152.001579+seed));
 }
 
 // 2D Noise based on Morgan McGuire @morgan3d
@@ -72,7 +69,7 @@ float circleGrad(in vec2 st) {
 
 float maskShape(in vec2 st) {
     //noisy vignette
-    return circleGrad(st) * fbm(st, 4., 2., 0.0);
+    return circleGrad(st) * fbm(st, 2., 2., 0.0);
 }
 
 

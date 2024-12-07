@@ -20,7 +20,7 @@ const floorMaterial = new CustomShadowedNoise({
   uGain: 1.0,
   uLevel: 0.05,
   uScale: 6,
-  uOctaves: 4,
+  uOctaves: 3,
   uSeed: 7,
 })
 const testMaterial = new MeshBasicMaterial({ color: 'green', alphaTest: 2 })

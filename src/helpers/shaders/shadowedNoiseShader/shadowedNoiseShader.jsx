@@ -5,7 +5,6 @@ import { shaderMaterial } from '@react-three/drei'
 import vertex from './glsl/shader.vert'
 import fragment from './glsl/shader.frag'
 import { forwardRef, useImperativeHandle, useRef } from 'react'
-import { mergeUniforms } from 'three/src/renderers/shaders/UniformsUtils'
 import { UniformsLib } from 'three/src/renderers/shaders/UniformsLib'
 
 const uniforms = {

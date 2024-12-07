@@ -1,4 +1,4 @@
-
+precision mediump float;
 
 #include <common>
 #include <shadowmap_pars_vertex>

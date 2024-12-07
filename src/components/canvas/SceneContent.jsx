@@ -5,7 +5,7 @@ import { PerspectiveCamera, Text3D } from '@react-three/drei'
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Vector3 } from 'three'
 import { Physics } from '@react-three/rapier'
-import { useSFX, useMusic } from '@/helpers/AudioManager'
+import { useSFX, useMusic, useVO } from '@/helpers/AudioManager'
 import { useModels, useTent } from '@/helpers/gltfLoadingMan'
 import { levelMaterial, gloveMaterial, floorMaterial, tentMaterial } from '@/helpers/materials'
 import { useRaycaster } from '@/helpers/useRaycaster'
@@ -45,11 +45,13 @@ const SceneContent = () => {
   const [points, setPoints] = useState(0)
   const [ko, setKO] = useState(null)
   const [hitPosition, setHitPosition] = useState(null)
+  const [TO, setTO] = useState(null)
   let punching = [false, false]
   //functions
   const getRaycastHit = useRaycaster()
   const sfx = useSFX(SERVER_PATH)
   const music = useMusic(SERVER_PATH)
+  const { play: playVO, selectInactivityVO } = useVO(SERVER_PATH)
   const setBoboObjWrapper = (obj) => {
     setBoboObj(obj)
   }
@@ -79,7 +81,9 @@ const SceneContent = () => {
 
   useEffect(() => {
     const clock = setInterval(() => {
-      setClockTime(clockTime - 1)
+      if (clockTime > 0) {
+        setClockTime(clockTime - 1)
+      }
     }, 1000)
     return () => clearInterval(clock)
   }, [clockTime])
@@ -91,6 +95,7 @@ const SceneContent = () => {
 
   //round transition
   const endRound = useCallback(() => {
+    clearTimeout(TO);
     const gameOver = round >= MAX_ROUNDS
     const koValue = gameOver ? 'STOP' : clockTime > 0 ? 'KO' : 'TIME'
     const koBonus = clockTime > 0 ? clockTime / 2 : 0
@@ -129,6 +134,20 @@ const SceneContent = () => {
     return () => clearTimeout(to)
   }, [ko, round, ROUND_TIME, setRound, setClockTime, setSwings, setPoints, sfx])
 
+  // timeout
+  useEffect(() => {
+    const to = setTimeout(() => {
+      promptUser();
+    }, 10000);
+    setTO(to);
+    return () => clearTimeout(to)
+    }, [round, swings, points])
+  }
+
+  const promptUser = () => {
+    const id = selectInactivityVO();
+    playVO({ id: id });
+  }
   ///////////////////////////////////
   // animation
   /////////////////////////////////
@@ -150,6 +169,8 @@ const SceneContent = () => {
         setCamPosition(currentPos)
         const restRot = camSpring.rotation.get()
         setCamRotation(restRot)
+        //modify points as hack to restart timeout effect
+        setPoints(points + 0.001)
       },
     }),
     [camPosition, nextCamPosition, camRotation, nextCamRotation],

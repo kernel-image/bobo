@@ -148,7 +148,7 @@ const SceneContent = () => {
       setKO(null)
     }, 4000)
     return () => clearTimeout(to)
-  }, [ko, round, ROUND_TIME, setRound, setClockTime, setSwings, setPoints, playSFX, playVO, router, voAPI])
+  }, [ko, round, ROUND_TIME, setRound, setClockTime, setSwings, setPoints, playSFX, playVO, router, voAPI, stopMusic])
 
   const restartTimeout = useCallback(() => {
     //modify points as hack to restart timeout effect

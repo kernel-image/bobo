@@ -28,7 +28,7 @@ function BurstSprite({ x, y, z, color = new Color(1.0, 0.65, 0.0), lifespan = 0.
         clearTimeout(timer)
       }
     }
-  }, [position])
+  }, [position, lifespan])
 
   useFrame((state, delta) => {
     if (spriteRef.current) {

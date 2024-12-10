@@ -29,4 +29,5 @@ export const spritemap = {
   punch$inactivity$sometimes_you_just_gotta_punch_a_clown: [48518, 2909],
   punch$laughter: [51427, 3568],
   punch$chuckling: [54995, 1901],
+  end: [57077, 13636],
 }

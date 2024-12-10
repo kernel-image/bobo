@@ -10,7 +10,6 @@ const useSFX = (SERVER_PATH) => {
     sprite: SFXspritemap,
     loop: false,
   })
-  //console.log(spritemap)
   return play
 }
 
@@ -18,22 +17,22 @@ const useMusic = (SERVER_PATH) => {
   const [play] = useSound(`${SERVER_PATH}/audio/organ_grinder_01.mp3`, {
     loop: true,
     playbackRate: 0.8,
+    interrupt: true,
   })
   return play
 }
 
 const useVO = (SERVER_PATH) => {
-  const [play] = useSound(`${SERVER_PATH}/audio/bobo_vo.mp3`, {
+  const [play, { sound }] = useSound(`${SERVER_PATH}/audio/bobo_vo.mp3`, {
     sprite: VOspritemap,
     loop: false,
     interrupt: true,
     onEnd: () => {},
   })
-  return play
+  return { play, sound }
 }
 
 const getRandomID = (tag) => {
-  //console.log('getting vo id matching tag: ' + tag)
   const voKeys = getVO(tag)
   const idx = Math.floor(Math.random() * voKeys.length)
   const id = voKeys[idx]

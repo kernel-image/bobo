@@ -5,7 +5,7 @@ import { PerspectiveCamera, Text3D } from '@react-three/drei'
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Vector3 } from 'three'
 import { Physics } from '@react-three/rapier'
-import { useSFX, useMusic } from '@/helpers/AudioManager'
+import { useSFX, useMusic, useVO, getRandomID } from '@/helpers/AudioManager'
 import { useModels, useTent } from '@/helpers/gltfLoadingMan'
 import { levelMaterial, gloveMaterial, floorMaterial, tentMaterial } from '@/helpers/materials'
 import { useRaycaster } from '@/helpers/useRaycaster'
@@ -17,6 +17,8 @@ import { nullPointerErrorHandler } from '@/helpers/nullPointerErrorHandler'
 import { StatusUI, FinalStatusUI } from '@/helpers/components/StatusUI'
 import { Lights } from './View'
 import { BurstSprite } from '@/helpers/components/BurstVFX'
+import { useRouter } from 'next/navigation'
+
 const SceneContent = () => {
   //constants
   const SERVER_PATH = process.env.NODE_ENV === 'development' ? '' : 'https://www.kernel-image.net/bobo'
@@ -25,10 +27,11 @@ const SceneContent = () => {
   const PLAYER_HEIGHT = 1.5
   const CAM_ORIGIN = useMemo(() => [0, PLAYER_HEIGHT, 1.5], [PLAYER_HEIGHT])
   const CAM_EXTENT = 2
-  const GLOVE_ORIGINS = {
-    right: [0.5, -0.5, -0.8],
-    left: [-0.5, -0.5, -0.8],
-  }
+  const GLOVE_ORIGINS = [
+    [-0.5, -0.5, -0.8],
+    [0.5, -0.5, -0.8],
+  ]
+  const EPSILON = 0.01
   //refs
   const cameraRef = useRef(null)
   const floorRef = useRef(null)
@@ -46,11 +49,16 @@ const SceneContent = () => {
   const [points, setPoints] = useState(0)
   const [ko, setKO] = useState(null)
   const [hitPosition, setHitPosition] = useState(null)
-  let punching = [false, false]
+  const [TO, setTO] = useState(null)
+  const [punchingLeft, setPunchingLeft] = useState(false)
+  const [punchingRight, setPunchingRight] = useState(false)
   //functions
   const getRaycastHit = useRaycaster()
-  const sfx = useSFX(SERVER_PATH)
-  const music = useMusic(SERVER_PATH)
+  const playSFX = useSFX(SERVER_PATH)
+  const playMusic = useMusic(SERVER_PATH)
+  const { play: playVO, sound: voAPI } = useVO(SERVER_PATH)
+  const router = useRouter()
+  //wrapping setters to maintain context before passing to RigidBodyWorld component
   const setBoboObjWrapper = (obj) => {
     setBoboObj(obj)
   }
@@ -80,18 +88,22 @@ const SceneContent = () => {
 
   useEffect(() => {
     const clock = setInterval(() => {
-      setClockTime(clockTime - 1)
+      if (clockTime > 0) {
+        setClockTime(clockTime - 1)
+      }
     }, 1000)
     return () => clearInterval(clock)
   }, [clockTime])
 
   //autostart
   useEffect(() => {
-    music()
-  }, [music])
+    playMusic()
+    playVO({ id: getRandomID('start') })
+  }, [playMusic, playVO])
 
   //round transition
   const endRound = useCallback(() => {
+    clearTimeout(TO)
     const gameOver = round >= MAX_ROUNDS
     const koValue = gameOver ? 'STOP' : clockTime > 0 ? 'KO' : 'TIME'
     const koBonus = clockTime > 0 ? clockTime / 2 : 0
@@ -101,11 +113,11 @@ const SceneContent = () => {
       setNextCamPosition(CAM_ORIGIN)
       setNextCamRotation([0, 0, 0])
     }
-    sfx({ id: 'bell' })
+    playSFX({ id: 'bell' })
     resetPlayer()
     setPoints(blows)
     setKO(koValue)
-  }, [round, clockTime, points, swings, sfx, CAM_ORIGIN])
+  }, [CAM_ORIGIN, TO, clockTime, playSFX, points, round, swings])
 
   useEffect(() => {
     if (clockTime === 0) {
@@ -113,13 +125,20 @@ const SceneContent = () => {
     }
   }, [clockTime, endRound])
 
+  //handle round end
   useEffect(() => {
     if (ko === 'STOP') {
+      voAPI.on('end', () => exitGame())
+      const exitGame = () => {
+        router.push('/')
+      }
+      playVO({ id: 'end' })
       return
     }
+    //setup next round
     const to = setTimeout(() => {
       if (ko && ko !== 'STOP') {
-        sfx({ id: 'bell' })
+        playSFX({ id: 'bell' })
         setClockTime(ROUND_TIME)
         setSwings(0)
         setPoints(0)
@@ -128,7 +147,31 @@ const SceneContent = () => {
       setKO(null)
     }, 4000)
     return () => clearTimeout(to)
-  }, [ko, round, ROUND_TIME, setRound, setClockTime, setSwings, setPoints, sfx])
+  }, [ko, round, ROUND_TIME, setRound, setClockTime, setSwings, setPoints, playSFX, playVO, router, voAPI])
+
+  const restartTimeout = useCallback(() => {
+    //modify points as hack to restart timeout effect
+    setPoints(points - 0.0001)
+  }, [points])
+
+  // timeout
+  useEffect(() => {
+    if (ko === 'STOP') {
+      return
+    }
+    const promptUser = () => {
+      const id = getRandomID('inactivity')
+      playVO({ id: id })
+    }
+    //console.log('start timeout')
+    const to = setTimeout(() => {
+      //console.log('end timeout')
+      promptUser()
+      restartTimeout()
+    }, 10000)
+    setTO(to)
+    return () => clearTimeout(to)
+  }, [playVO, restartTimeout, ko])
 
   ///////////////////////////////////
   // animation
@@ -151,6 +194,7 @@ const SceneContent = () => {
         setCamPosition(currentPos)
         const restRot = camSpring.rotation.get()
         setCamRotation(restRot)
+        restartTimeout()
       },
     }),
     [camPosition, nextCamPosition, camRotation, nextCamRotation],
@@ -173,8 +217,8 @@ const SceneContent = () => {
   )
 
   //punch spring
-  const [leftTarget, setLeftTarget] = useState(GLOVE_ORIGINS.left)
-  const [rightTarget, setRightTarget] = useState(GLOVE_ORIGINS.right)
+  const [leftTarget, setLeftTarget] = useState(GLOVE_ORIGINS[0])
+  const [rightTarget, setRightTarget] = useState(GLOVE_ORIGINS[1])
 
   const gloveSpringConfig = {
     mass: 1,
@@ -188,8 +232,8 @@ const SceneContent = () => {
     2,
     [
       {
-        from: { position: GLOVE_ORIGINS.left },
-        to: [{ position: leftTarget }, { position: GLOVE_ORIGINS.left }],
+        from: { position: GLOVE_ORIGINS[0] },
+        to: [{ position: leftTarget }, { position: GLOVE_ORIGINS[0] }],
         config: gloveSpringConfig,
         onChange: () => {
           updateKinematicObjects()
@@ -198,8 +242,8 @@ const SceneContent = () => {
         onRest: () => stopPunchingState(0),
       },
       {
-        from: { position: GLOVE_ORIGINS.right },
-        to: [{ position: rightTarget }, { position: GLOVE_ORIGINS.right }],
+        from: { position: GLOVE_ORIGINS[1] },
+        to: [{ position: rightTarget }, { position: GLOVE_ORIGINS[1] }],
         config: gloveSpringConfig,
         onChange: () => {
           updateKinematicObjects()
@@ -210,6 +254,22 @@ const SceneContent = () => {
     ],
     [leftTarget, rightTarget],
   )
+
+  const isGloveAtOrigin = (key) => {
+    return gloveSprings[key].position
+      .get()
+      .every((value, index) => Math.abs(value - GLOVE_ORIGINS[key][index]) < EPSILON)
+  }
+
+  const isTargetAtOrigin = (key) => {
+    if (key) {
+      return rightTarget.every((value, index) => Math.abs(value - GLOVE_ORIGINS[1][index]) < EPSILON)
+    } else if (key === 0) {
+      return leftTarget.every((value, index) => Math.abs(value - GLOVE_ORIGINS[0][index]) < EPSILON)
+    }
+    //console.log('isTargetAtOrigin error')
+    return false
+  }
 
   //punch logic
 
@@ -226,11 +286,15 @@ const SceneContent = () => {
   }
 
   const startPunchingState = (key) => {
-    punching[key] = true
+    if (key) {
+      setPunchingRight(true)
+    } else {
+      setPunchingLeft(true)
+    }
   }
 
   const onPunch = () => {
-    sfx({ id: 'whoosh' })
+    playSFX({ id: 'whoosh' })
     setSwings(swings + 1)
   }
 
@@ -249,17 +313,24 @@ const SceneContent = () => {
   }
 
   const stopPunchingState = (key) => {
+    console.log('trying to stop punching state key: ' + key)
     if (key) {
-      if (rightTarget.some((value, index) => value !== GLOVE_ORIGINS.right[index])) {
-        setRightTarget(GLOVE_ORIGINS.right)
+      if (!isTargetAtOrigin(1)) {
+        setRightTarget(GLOVE_ORIGINS[1])
+      } else if (isGloveAtOrigin(1)) {
+        setPunchingRight(false)
+        console.log('stop punching state right')
       } else {
-        punching[key] = false //TODO: FIX RACE CONDITION WHERE PUNCH IS CONSIDERED COMPLETE BEFORE IT HAS FINISHED
+        console.log('right glove is not at origin and neither is target')
       }
-    } else {
-      if (leftTarget.some((value, index) => value !== GLOVE_ORIGINS.left[index])) {
-        setLeftTarget(GLOVE_ORIGINS.left)
+    } else if (key === 0) {
+      if (!isTargetAtOrigin(0)) {
+        setLeftTarget(GLOVE_ORIGINS[0])
+      } else if (isGloveAtOrigin(0)) {
+        setPunchingLeft(false)
+        console.log('stop punching state left')
       } else {
-        punching[key] = false
+        console.log('left glove is not at origin and neither is target')
       }
     }
   }
@@ -270,14 +341,14 @@ const SceneContent = () => {
     const nextPos = [0, PLAYER_HEIGHT, 0]
     setNextCamPosition(nextPos)
     lookAtBobo(nextPos)
-    sfx({ id: 'whoosh' })
+    playSFX({ id: 'whoosh' })
   }
 
   const navigateToPoint = (point) => {
     const nextPos = correctNextCamPosition(point)
     setNextCamPosition(nextPos)
     lookAtBobo(nextPos)
-    sfx({ id: 'whoosh' })
+    playSFX({ id: 'whoosh' })
   }
 
   const checkNextCamPosition = (nextPos) => {
@@ -348,23 +419,23 @@ const SceneContent = () => {
     if (target) {
       //console.log(`hit ${target.toArray()}`)
       if (shouldPunchRight(target)) {
-        if (!punching[1]) {
+        if (!punchingRight) {
           punchRight(target)
         }
       } else {
-        if (!punching[0]) {
+        if (!punchingLeft) {
           punchLeft(target)
         }
       }
     }
   }
 
-  const handleLevelClick = (event, naviagateToPoint) => {
+  const handleLevelClick = (event, floorClick) => {
     event.stopPropagation()
     if (ko || clockTime <= 0) return
     //console.log('level clicked')
-    if (punching.every((value) => value === false)) {
-      if (naviagateToPoint) {
+    if (!punchingRight && !punchingLeft) {
+      if (floorClick) {
         const target = getRaycastHit(event.pointer, cameraRef.current, floorRef.current)
         if (target) {
           navigateToPoint(target)
@@ -379,9 +450,9 @@ const SceneContent = () => {
 
   const handleBoboContactForce = (e) => {
     if (e.rigidBodyObject.name === 'rightHand' || e.rigidBodyObject.name === 'leftHand') {
-      if (punching.some((value) => value === true)) {
+      if (punchingRight || punchingLeft) {
         const punchForce = e.totalForceMagnitude
-        //console.log(`punch force: ${punchForce}`) // getting ranges 0-22000 but avg is 300-3000
+        console.log(`punch force: ${punchForce}`) // getting ranges 0-22000 but avg is 300-3000
         if (punchForce > 3000) {
           setPoints(points + 1)
         } else if (punchForce > 2000) {
@@ -393,15 +464,22 @@ const SceneContent = () => {
         } else {
           setPoints(points + 0.1)
         }
-        sfx({ id: 'hit', volume: remap(punchForce, 0, 23000, 0, 1), playbackRate: (Math.random() - 0.75) * 0.6 + 1.0 })
-        setHitPosition({ ...e.rigidBodyObject.position }) // returns vector
+        playSFX({
+          id: 'hit',
+          volume: remap(punchForce, 0, 23000, 0, 1),
+          playbackRate: (Math.random() - 0.75) * 0.6 + 1.0,
+        })
+        setHitPosition({ ...e.rigidBodyObject.position }) // returns vector object
+        playVO({ id: getRandomID(e.rigidBodyObject.position.y < 0.5 ? 'dirty' : 'punch') })
+      } else {
+        console.log('not punching')
       }
     }
   }
 
   const handleSkyZoneEnter = (e) => {
     if (e.rigidBodyObject.name === 'bobo') {
-      //console.log('there he goes')
+      //playVO({ id: getRandomID('sky') })
       recenterCamera()
     }
   }

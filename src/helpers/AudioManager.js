@@ -14,12 +14,12 @@ const useSFX = (SERVER_PATH) => {
 }
 
 const useMusic = (SERVER_PATH) => {
-  const [play] = useSound(`${SERVER_PATH}/audio/organ_grinder_01.mp3`, {
+  const [play, { stop }] = useSound(`${SERVER_PATH}/audio/organ_grinder_01.mp3`, {
     loop: true,
     playbackRate: 0.8,
     interrupt: true,
   })
-  return play
+  return { play, stop }
 }
 
 const useVO = (SERVER_PATH) => {

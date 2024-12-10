@@ -55,7 +55,7 @@ const SceneContent = () => {
   //functions
   const getRaycastHit = useRaycaster()
   const playSFX = useSFX(SERVER_PATH)
-  const playMusic = useMusic(SERVER_PATH)
+  const { play: playMusic, stop: stopMusic } = useMusic(SERVER_PATH)
   const { play: playVO, sound: voAPI } = useVO(SERVER_PATH)
   const router = useRouter()
   //wrapping setters to maintain context before passing to RigidBodyWorld component
@@ -130,6 +130,7 @@ const SceneContent = () => {
     if (ko === 'STOP') {
       voAPI.on('end', () => exitGame())
       const exitGame = () => {
+        stopMusic()
         router.push('/')
       }
       playVO({ id: 'end' })

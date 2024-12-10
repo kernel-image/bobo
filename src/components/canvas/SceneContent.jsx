@@ -507,7 +507,7 @@ const SceneContent = () => {
       <Lights />
       {/* Camera */}
       <animated.group position={camSpring.position} rotation={camSpring.rotation}>
-        <PerspectiveCamera makeDefault fov={90} ref={cameraRef} near={0.1} far={20}>
+        <PerspectiveCamera makeDefault fov={90} ref={cameraRef} near={0.1} far={50}>
           {/* UI */}
           {ko === 'STOP' ? (
             <FinalStatusUI stats={score.current} />
@@ -560,7 +560,7 @@ const SceneContent = () => {
           />
         )
       })}
-      <primitive object={tent} position={[0, -3, 0]} scale={(0.5, 0.5, 0.5)} material={tentMaterial} />
+      <primitive object={tent} position={[0, -3, 0]} scale={(0.5, 0.5, 0.5)} material={tentMaterial} renderOrder={-1} />
     </group>
   )
 }

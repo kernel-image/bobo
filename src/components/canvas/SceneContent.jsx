@@ -17,6 +17,7 @@ import { nullPointerErrorHandler } from '@/helpers/nullPointerErrorHandler'
 import { StatusUI, FinalStatusUI } from '@/helpers/components/StatusUI'
 import { Lights } from './View'
 import { BurstSprite } from '@/helpers/components/BurstVFX'
+import { useRouter } from 'next/navigation'
 
 const SceneContent = () => {
   //constants
@@ -51,13 +52,13 @@ const SceneContent = () => {
   const [TO, setTO] = useState(null)
   const [punchingLeft, setPunchingLeft] = useState(false)
   const [punchingRight, setPunchingRight] = useState(false)
-  //const punching = [punchingLeft, punchingRight]
   //functions
   const getRaycastHit = useRaycaster()
   const playSFX = useSFX(SERVER_PATH)
   const playMusic = useMusic(SERVER_PATH)
-  const playVO = useVO(SERVER_PATH)
-
+  const { play: playVO, sound: voAPI } = useVO(SERVER_PATH)
+  const router = useRouter()
+  //wrapping setters to maintain context before passing to RigidBodyWorld component
   const setBoboObjWrapper = (obj) => {
     setBoboObj(obj)
   }
@@ -127,6 +128,11 @@ const SceneContent = () => {
   //handle round end
   useEffect(() => {
     if (ko === 'STOP') {
+      voAPI.on('end', () => exitGame())
+      const exitGame = () => {
+        router.push('/')
+      }
+      playVO({ id: 'end' })
       return
     }
     //setup next round
@@ -141,7 +147,7 @@ const SceneContent = () => {
       setKO(null)
     }, 4000)
     return () => clearTimeout(to)
-  }, [ko, round, ROUND_TIME, setRound, setClockTime, setSwings, setPoints, playSFX])
+  }, [ko, round, ROUND_TIME, setRound, setClockTime, setSwings, setPoints, playSFX, playVO, router, voAPI])
 
   const restartTimeout = useCallback(() => {
     //modify points as hack to restart timeout effect
@@ -261,7 +267,7 @@ const SceneContent = () => {
     } else if (key === 0) {
       return leftTarget.every((value, index) => Math.abs(value - GLOVE_ORIGINS[0][index]) < EPSILON)
     }
-    console.log('isTargetAtOrigin error')
+    //console.log('isTargetAtOrigin error')
     return false
   }
 

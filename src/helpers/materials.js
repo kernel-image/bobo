@@ -29,6 +29,7 @@ const tentMaterial = new CustomRays({
   color2: new Color(0.1, 0, 0.1),
   rays: 32,
   side: BackSide,
+  depthTest: false,
 })
 
 export { levelMaterial, gloveMaterial, floorMaterial, testMaterial, tentMaterial }

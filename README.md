@@ -18,3 +18,5 @@ Sound Effects redistributed by https://freesound.org/people/craigsmith/
 Voice generated with [bark](https://github.com/suno-ai/bark)
 
 GLSL shaders inspired by [Patricio Gonzalez Vivo](https://patriciogonzalezvivo.com/) [Jen Lowe](https://www.jenlowe.net/) and [Inigo Quilez](https://iquilezles.org/)
+
+[Original research](https://psychclassics.yorku.ca/Bandura/bobo.htm) by Albert Bandura, Dorothea Ross, and Sheila A. Ross

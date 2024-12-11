@@ -22,11 +22,16 @@ const View = dynamic(() => import('@/components/canvas/View').then((mod) => mod.
   ),
 })
 
-export default function Page () {
+export default function Page() {
   return (
     <div className='h-full bg-gradient-to-b from-blue-400 via-pink-300 to-orange-200'>
-      <h1 className='text-9xl font-bold'>SHOW US WHAT YOU GOT</h1>
-      <h2 className='text-8xl font-bold'>--&gt;</h2>
+      <h1 className='text-4xl font-bold sm:text-6xl lg:text-9xl portrait:block landscape:hidden'>
+        TURN SIDEWAYS TO ENTER
+      </h1>
+      <h1 className='text-4xl font-bold sm:text-6xl lg:text-9xl portrait:hidden landscape:block'>
+        SHOW US WHAT YOU GOT
+      </h1>
+      <h2 className='text-4xl font-bold sm:text-6xl lg:text-9xl'>--&gt;</h2>
       <View className='absolute top-0 h-full sm:w-full '>
         <Suspense fallback={null}>
           <Content />

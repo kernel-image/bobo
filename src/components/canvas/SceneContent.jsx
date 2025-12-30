@@ -314,24 +314,24 @@ const SceneContent = () => {
   }
 
   const stopPunchingState = (key) => {
-    console.log('trying to stop punching state key: ' + key)
+    //console.log('trying to stop punching state key: ' + key)
     if (key) {
       if (!isTargetAtOrigin(1)) {
         setRightTarget(GLOVE_ORIGINS[1])
       } else if (isGloveAtOrigin(1)) {
         setPunchingRight(false)
-        console.log('stop punching state right')
+        //console.log('stop punching state right')
       } else {
-        console.log('right glove is not at origin and neither is target')
+        //console.log('right glove is not at origin and neither is target')
       }
     } else if (key === 0) {
       if (!isTargetAtOrigin(0)) {
         setLeftTarget(GLOVE_ORIGINS[0])
       } else if (isGloveAtOrigin(0)) {
         setPunchingLeft(false)
-        console.log('stop punching state left')
+        //console.log('stop punching state left')
       } else {
-        console.log('left glove is not at origin and neither is target')
+        //console.log('left glove is not at origin and neither is target')
       }
     }
   }
@@ -453,7 +453,7 @@ const SceneContent = () => {
     if (e.rigidBodyObject.name === 'rightHand' || e.rigidBodyObject.name === 'leftHand') {
       if (punchingRight || punchingLeft) {
         const punchForce = e.totalForceMagnitude
-        console.log(`punch force: ${punchForce}`) // getting ranges 0-22000 but avg is 300-3000
+        //console.log(`punch force: ${punchForce}`) // getting ranges 0-22000 but avg is 300-3000
         if (punchForce > 3000) {
           setPoints(points + 1)
         } else if (punchForce > 2000) {
@@ -473,7 +473,7 @@ const SceneContent = () => {
         setHitPosition({ ...e.rigidBodyObject.position }) // returns vector object
         playVO({ id: getRandomID(e.rigidBodyObject.position.y < 0.5 ? 'dirty' : 'punch') })
       } else {
-        console.log('not punching')
+        //console.log('not punching')
       }
     }
   }

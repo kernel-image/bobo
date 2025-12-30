@@ -16,7 +16,7 @@ const nextConfig = {
   images: {},
   //xhr support
   crossOrigin: 'anonymous',
-  headers: [
+  async headers() { return [
     {
       source: '/:path*',
       headers: [
@@ -34,7 +34,8 @@ const nextConfig = {
         },
       ],
     },
-  ],
+  ];
+},
   webpack(config, { isServer }) {
     if (!isServer) {
       // We're in the browser build, so we can safely exclude the sharp module

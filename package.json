@@ -23,13 +23,13 @@
     "@react-three/fiber": "^8.18.0",
     "@react-three/rapier": "^1.5.0",
     "glsl-random": "^0.0.5",
+    "howler": "^2.2.4",
     "next": "^14.2.35",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "three": "^0.160.0",
     "three-stdlib": "^2.28.9",
-    "tunnel-rat": "^0.1.2",
-    "use-sound": "^4.0.3"
+    "tunnel-rat": "^0.1.2"
   },
   "devDependencies": {
     "@next/bundle-analyzer": "^14.0.4",

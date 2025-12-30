@@ -75,7 +75,7 @@ const useSafeSound = (url, options = {}) => {
 
   const play = useCallback((...args) => {
     if (soundRef.current && isLoaded) { // Only play immediately if loaded
-       // Handle interrupt logic if desired, matching use-sound behavior
+       // Handle interrupt logic: stop any existing instances before playing a new one
        if (interrupt) {
         soundRef.current.stop();
        }
@@ -140,7 +140,7 @@ const useSafeSound = (url, options = {}) => {
     }
   }, []);
 
-  // Return API matching use-sound
+  // Return API compatible with previous implementation
   return [
     play,
     {

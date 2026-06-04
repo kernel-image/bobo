@@ -4,7 +4,7 @@ A little game using r3f with react-three-rapier, react-spring, use-sound. Based 
 
 # Usage
 
-The game is currently hosted at https://bobo-kernel-images-projects.vercel.app/
+The game is currently hosted at https://bobo-umber-two.vercel.app/
 
 # Acknowledgment
 

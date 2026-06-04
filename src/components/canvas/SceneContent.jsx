@@ -21,7 +21,7 @@ import { useRouter } from 'next/navigation'
 
 const SceneContent = () => {
   //constants
-  const SERVER_PATH = process.env.NODE_ENV === 'development' ? '' : 'https://www.kernel-image.net/bobo'
+  const SERVER_PATH = process.env.NEXT_PUBLIC_SERVER_URL
   const MAX_ROUNDS = 5
   const ROUND_TIME = 60
   const PLAYER_HEIGHT = 1.5

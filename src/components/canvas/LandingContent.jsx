@@ -8,7 +8,8 @@ import { useFrame } from '@react-three/fiber'
 import { useRef } from 'react'
 
 const SceneContent = () => {
-  const tent = useTent('')
+  const SERVER_PATH = process.env.NEXT_PUBLIC_SERVER_URL
+  const tent = useTent(SERVER_PATH)
   const router = useRouter()
   const worldRef = useRef()
 
